@@ -183,6 +183,69 @@ The following command line options are available for the `start` command:
 | ------ | ------------------------- | ------- | ----- |
 | --json | Output debug info as JSON | false   | none  |
 
+## Proxy Configuration
+
+If you are behind a corporate firewall or need to route traffic through a proxy server, you can configure the proxy using environment variables.
+
+### Using the `--proxy-env` Flag
+
+Start the server with the `--proxy-env` flag to automatically read proxy settings from environment variables:
+
+```sh
+# Set proxy environment variables first
+export HTTP_PROXY=http://your-proxy-server:8080
+export HTTPS_PROXY=http://your-proxy-server:8080
+
+# Start with proxy support
+npx copilot-api-plus@latest start --proxy-env
+```
+
+On Windows (PowerShell):
+
+```powershell
+$env:HTTP_PROXY = "http://your-proxy-server:8080"
+$env:HTTPS_PROXY = "http://your-proxy-server:8080"
+npx copilot-api-plus@latest start --proxy-env
+```
+
+On Windows (CMD):
+
+```cmd
+set HTTP_PROXY=http://your-proxy-server:8080
+set HTTPS_PROXY=http://your-proxy-server:8080
+npx copilot-api-plus@latest start --proxy-env
+```
+
+### Supported Proxy Environment Variables
+
+| Variable      | Description                               |
+| ------------- | ----------------------------------------- |
+| `HTTP_PROXY`  | Proxy URL for HTTP connections            |
+| `HTTPS_PROXY` | Proxy URL for HTTPS connections           |
+| `http_proxy`  | Alternative (lowercase) for HTTP proxy    |
+| `https_proxy` | Alternative (lowercase) for HTTPS proxy   |
+| `NO_PROXY`    | Comma-separated list of hosts to bypass   |
+| `no_proxy`    | Alternative (lowercase) for no-proxy list |
+
+### Proxy Authentication
+
+If your proxy requires authentication, include the credentials in the URL:
+
+```sh
+export HTTPS_PROXY=http://username:password@your-proxy-server:8080
+```
+
+### Docker with Proxy
+
+When running in Docker, pass the proxy environment variables:
+
+```sh
+docker run -p 4141:4141 \
+  -e HTTP_PROXY=http://your-proxy:8080 \
+  -e HTTPS_PROXY=http://your-proxy:8080 \
+  copilot-api-plus start --proxy-env
+```
+
 ## API Endpoints
 
 The server exposes several endpoints to interact with the Copilot API. It provides OpenAI-compatible endpoints and now also includes support for Anthropic-compatible endpoints, allowing for greater flexibility with different tools and services.
@@ -272,10 +335,10 @@ After starting the server, a URL to the Copilot Usage Dashboard will be displaye
 
 1.  Start the server. For example, using npx:
     ```sh
-    npx copilot-api@latest start
+    npx copilot-api-plus@latest start
     ```
 2.  The server will output a URL to the usage viewer. Copy and paste this URL into your browser. It will look something like this:
-    `https://ericc-ch.github.io/copilot-api?endpoint=http://localhost:4141/usage`
+    `https://imbuxiangnan-cyber.github.io/copilot-api-plus?endpoint=http://localhost:4141/usage`
     - If you use the `start.bat` script on Windows, this page will open automatically.
 
 The dashboard provides a user-friendly interface to view your Copilot usage data:
@@ -285,7 +348,7 @@ The dashboard provides a user-friendly interface to view your Copilot usage data
 - **Usage Quotas**: View a summary of your usage quotas for different services like Chat and Completions, displayed with progress bars for a quick overview.
 - **Detailed Information**: See the full JSON response from the API for a detailed breakdown of all available usage statistics.
 - **URL-based Configuration**: You can also specify the API endpoint directly in the URL using a query parameter. This is useful for bookmarks or sharing links. For example:
-  `https://ericc-ch.github.io/copilot-api?endpoint=http://your-api-server/usage`
+  `https://imbuxiangnan-cyber.github.io/copilot-api-plus?endpoint=http://your-api-server/usage`
 
 ## Using with Claude Code
 
@@ -298,7 +361,7 @@ There are two ways to configure Claude Code to use this proxy:
 To get started, run the `start` command with the `--claude-code` flag:
 
 ```sh
-npx copilot-api@latest start --claude-code
+npx copilot-api-plus@latest start --claude-code
 ```
 
 You will be prompted to select a primary model and a "small, fast" model for background tasks. After selecting the models, a command will be copied to your clipboard. This command sets the necessary environment variables for Claude Code to use the proxy.
