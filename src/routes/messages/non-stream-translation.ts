@@ -8,6 +8,8 @@ import {
   type ToolCall,
 } from "~/services/copilot/create-chat-completions"
 
+import { state } from "~/lib/state"
+
 import {
   type AnthropicAssistantContentBlock,
   type AnthropicAssistantMessage,
@@ -47,12 +49,48 @@ export function translateToOpenAI(
 }
 
 function translateModelName(model: string): string {
-  // Subagent requests use a specific model number which Copilot doesn't support
-  if (model.startsWith("claude-sonnet-4-")) {
-    return model.replace(/^claude-sonnet-4-.*/, "claude-sonnet-4")
-  } else if (model.startsWith("claude-opus-")) {
-    return model.replace(/^claude-opus-4-.*/, "claude-opus-4")
+  // Claude Code 发送的模型名称可能与 GitHub Copilot 支持的不一致
+  // 需要智能匹配到 Copilot 实际支持的模型
+  
+  const supportedModels = state.models?.data.map((m) => m.id) ?? []
+  
+  // 1. 直接匹配
+  if (supportedModels.includes(model)) {
+    return model
   }
+  
+  // 2. 移除日期后缀后匹配 (claude-opus-4-5-20251101 -> claude-opus-4-5)
+  const modelBase = model.replace(/-\d{8}$/, "")
+  if (supportedModels.includes(modelBase)) {
+    return modelBase
+  }
+  
+  // 3. 尝试 4-5 -> 4.5 格式转换 (claude-opus-4-5 -> claude-opus-4.5)
+  const modelWithDot = modelBase.replace(/-(\d+)-(\d+)$/, "-$1.$2")
+  if (supportedModels.includes(modelWithDot)) {
+    return modelWithDot
+  }
+  
+  // 4. 尝试 4.5 -> 4-5 格式转换 (claude-opus-4.5 -> claude-opus-4-5)
+  const modelWithDash = model.replace(/(\d+)\.(\d+)/, "$1-$2")
+  if (supportedModels.includes(modelWithDash)) {
+    return modelWithDash
+  }
+  
+  // 5. 回退：按模型系列查找可用模型
+  const modelFamily = model.includes("opus") ? "opus" 
+    : model.includes("sonnet") ? "sonnet"
+    : model.includes("haiku") ? "haiku"
+    : null
+    
+  if (modelFamily) {
+    const familyModel = supportedModels.find((m) => m.includes(modelFamily))
+    if (familyModel) {
+      return familyModel
+    }
+  }
+
+  // 6. 如果都找不到，返回原始模型名
   return model
 }
 
