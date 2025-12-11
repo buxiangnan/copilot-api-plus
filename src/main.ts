@@ -6,6 +6,7 @@ import { auth } from "./auth"
 import { checkUsage } from "./check-usage"
 import { debug } from "./debug"
 import { logout } from "./logout"
+import { proxy } from "./proxy-config"
 import { start } from "./start"
 
 const main = defineCommand({
@@ -14,7 +15,7 @@ const main = defineCommand({
     description:
       "A wrapper around GitHub Copilot API to make it OpenAI/Anthropic compatible. Fork with bug fixes and improvements.",
   },
-  subCommands: { auth, start, "check-usage": checkUsage, debug, logout },
+  subCommands: { auth, start, "check-usage": checkUsage, debug, logout, proxy },
 })
 
 await runMain(main)

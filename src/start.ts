@@ -6,6 +6,7 @@ import consola from "consola"
 import { serve, type ServerHandler } from "srvx"
 import invariant from "tiny-invariant"
 
+import { applyProxyConfig } from "./lib/config"
 import { ensurePaths } from "./lib/paths"
 import { initProxyFromEnv } from "./lib/proxy"
 import { generateEnvScript } from "./lib/shell"
@@ -55,7 +56,14 @@ interface RunServerOptions {
  *   - zenApiKey: OpenCode Zen API key (optional; if omitted will prompt for setup)
  */
 export async function runServer(options: RunServerOptions): Promise<void> {
+  // Apply saved proxy configuration first (if any)
+  const savedProxyApplied = await applyProxyConfig()
+  
+  // Then apply --proxy-env if specified (overrides saved config)
   if (options.proxyEnv) {
+    initProxyFromEnv()
+  } else if (savedProxyApplied) {
+    // If saved proxy was applied, initialize the proxy dispatcher
     initProxyFromEnv()
   }
 
