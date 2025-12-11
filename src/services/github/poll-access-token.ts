@@ -41,32 +41,46 @@ export async function pollAccessToken(
       continue
     }
 
-    const json = (await response.json()) as AccessTokenResponse | AccessTokenErrorResponse
+    const json = (await response.json()) as
+      | AccessTokenResponse
+      | AccessTokenErrorResponse
     consola.debug("Polling access token response:", json)
 
     if ("access_token" in json && json.access_token) {
       return json.access_token
     }
-    
+
     // Handle specific error cases
     if ("error" in json) {
-      if (json.error === "authorization_pending") {
-        // User hasn't authorized yet, continue polling
-        await sleep(sleepDuration)
-        continue
-      } else if (json.error === "slow_down") {
-        // We're polling too fast, increase interval
-        await sleep(sleepDuration * 2)
-        continue
-      } else if (json.error === "expired_token") {
-        throw new Error("Device code expired. Please try again.")
-      } else if (json.error === "access_denied") {
-        throw new Error("Authorization was denied by the user.")
-      } else {
-        throw new Error(`Authentication failed: ${json.error_description || json.error}`)
+      switch (json.error) {
+        case "authorization_pending": {
+          // User hasn't authorized yet, continue polling
+          await sleep(sleepDuration)
+          continue
+
+          break
+        }
+        case "slow_down": {
+          // We're polling too fast, increase interval
+          await sleep(sleepDuration * 2)
+          continue
+
+          break
+        }
+        case "expired_token": {
+          throw new Error("Device code expired. Please try again.")
+        }
+        case "access_denied": {
+          throw new Error("Authorization was denied by the user.")
+        }
+        default: {
+          throw new Error(
+            `Authentication failed: ${json.error_description || json.error}`,
+          )
+        }
       }
     }
-    
+
     await sleep(sleepDuration)
   }
 

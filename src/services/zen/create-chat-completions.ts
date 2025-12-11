@@ -5,13 +5,16 @@
  */
 
 import consola from "consola"
+
 import { state } from "~/lib/state"
 
 export interface ZenChatCompletionRequest {
   model: string
   messages: Array<{
     role: string
-    content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>
+    content:
+      | string
+      | Array<{ type: string; text?: string; image_url?: { url: string } }>
   }>
   temperature?: number
   max_tokens?: number

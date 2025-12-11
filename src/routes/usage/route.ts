@@ -1,6 +1,5 @@
-import { Hono } from "hono"
-
 import consola from "consola"
+import { Hono } from "hono"
 
 import { getCopilotUsage } from "~/services/github/get-copilot-usage"
 

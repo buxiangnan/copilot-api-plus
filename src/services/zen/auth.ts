@@ -6,6 +6,7 @@
  */
 
 import consola from "consola"
+
 import { PATHS, ensurePaths } from "~/lib/paths"
 
 export interface ZenAuth {
@@ -96,7 +97,9 @@ export async function setupZenApiKey(force = false): Promise<string> {
     })
 
     if (!response.ok) {
-      throw new Error(`Invalid API key: ${response.status} ${response.statusText}`)
+      throw new Error(
+        `Invalid API key: ${response.status} ${response.statusText}`,
+      )
     }
 
     consola.success("API key validated successfully")

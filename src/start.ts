@@ -28,6 +28,7 @@ interface RunServerOptions {
   apiKeys?: Array<string>
   zen: boolean
   zenApiKey?: string
+  antigravity: boolean
 }
 
 /**
@@ -92,7 +93,9 @@ export async function runServer(options: RunServerOptions): Promise<void> {
       state.zenApiKey = options.zenApiKey
       consola.info("Using provided Zen API key")
     } else {
-      const { setupZenApiKey, loadZenAuth } = await import("~/services/zen/auth")
+      const { setupZenApiKey, loadZenAuth } = await import(
+        "~/services/zen/auth"
+      )
       const existingAuth = await loadZenAuth()
 
       if (existingAuth) {
@@ -110,6 +113,41 @@ export async function runServer(options: RunServerOptions): Promise<void> {
 
     consola.info(
       `Available Zen models: \n${state.zenModels?.data.map((model) => `- ${model.id}`).join("\n")}`,
+    )
+  } else if (options.antigravity) {
+    // Handle Antigravity mode
+    consola.info("Google Antigravity mode enabled")
+    state.antigravityMode = true
+
+    // Setup Antigravity accounts
+    const { loadAntigravityAuth, setupAntigravity, getCurrentAccount } =
+      await import("~/services/antigravity/auth")
+    const existingAuth = await loadAntigravityAuth()
+
+    if (!existingAuth || existingAuth.accounts.length === 0) {
+      consola.warn("No Antigravity accounts found")
+      await setupAntigravity()
+    } else {
+      const enabledCount = existingAuth.accounts.filter((a) => a.enable).length
+      consola.info(
+        `Found ${existingAuth.accounts.length} Antigravity accounts (${enabledCount} enabled)`,
+      )
+    }
+
+    const currentAccount = await getCurrentAccount()
+    if (!currentAccount) {
+      throw new Error("No enabled Antigravity accounts available")
+    }
+
+    // Get Antigravity models
+    const { getAntigravityModels } = await import(
+      "~/services/antigravity/get-models"
+    )
+    const models = await getAntigravityModels()
+    state.antigravityModels = models
+
+    consola.info(
+      `Available Antigravity models: \n${models.data.map((model) => `- ${model.id}`).join("\n")}`,
     )
   } else {
     // Standard Copilot mode
@@ -137,14 +175,16 @@ export async function runServer(options: RunServerOptions): Promise<void> {
       // If getting Copilot token fails with 401, the GitHub token might be invalid
       const { HTTPError } = await import("~/lib/error")
       if (error instanceof HTTPError && error.response.status === 401) {
-        consola.error("Failed to get Copilot token - GitHub token may be invalid or Copilot access revoked")
+        consola.error(
+          "Failed to get Copilot token - GitHub token may be invalid or Copilot access revoked",
+        )
         const { clearGithubToken } = await import("~/lib/token")
         await clearGithubToken()
         consola.info("Please restart to re-authenticate")
       }
       throw error
     }
-    
+
     await cacheModels()
 
     consola.info(
@@ -155,7 +195,10 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   const serverUrl = `http://localhost:${options.port}`
 
   if (options.claudeCode) {
-    const models = state.zenMode ? state.zenModels : state.models
+    const models =
+      state.zenMode ? state.zenModels
+      : state.antigravityMode ? state.antigravityModels
+      : state.models
     invariant(models, "Models should be loaded by now")
 
     const selectedModel = await consola.prompt(
@@ -281,11 +324,18 @@ export const start = defineCommand({
       alias: "z",
       type: "boolean",
       default: false,
-      description: "Enable OpenCode Zen mode (proxy to Zen instead of GitHub Copilot)",
+      description:
+        "Enable OpenCode Zen mode (proxy to Zen instead of GitHub Copilot)",
     },
     "zen-api-key": {
       type: "string",
       description: "OpenCode Zen API key (get from https://opencode.ai/zen)",
+    },
+    antigravity: {
+      type: "boolean",
+      default: false,
+      description:
+        "Enable Google Antigravity mode (proxy to Antigravity instead of GitHub Copilot)",
     },
   },
   run({ args }) {
@@ -315,6 +365,7 @@ export const start = defineCommand({
       apiKeys,
       zen: args.zen,
       zenApiKey: args["zen-api-key"],
+      antigravity: args.antigravity,
     })
   },
 })

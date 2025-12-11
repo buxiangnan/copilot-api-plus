@@ -5,6 +5,7 @@
  */
 
 import consola from "consola"
+
 import { state } from "~/lib/state"
 
 export interface ZenModel {
@@ -16,7 +17,7 @@ export interface ZenModel {
 
 export interface ZenModelsResponse {
   object: string
-  data: ZenModel[]
+  data: Array<ZenModel>
 }
 
 /**
@@ -36,7 +37,9 @@ export async function getZenModels(): Promise<ZenModelsResponse> {
   })
 
   if (!response.ok) {
-    throw new Error(`Failed to fetch Zen models: ${response.status} ${response.statusText}`)
+    throw new Error(
+      `Failed to fetch Zen models: ${response.status} ${response.statusText}`,
+    )
   }
 
   const data = (await response.json()) as ZenModelsResponse

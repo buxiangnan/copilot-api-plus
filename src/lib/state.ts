@@ -1,3 +1,4 @@
+import type { AntigravityModelsResponse } from "~/services/antigravity/get-models"
 import type { ModelsResponse } from "~/services/copilot/get-models"
 import type { ZenModelsResponse } from "~/services/zen/get-models"
 
@@ -23,7 +24,11 @@ export interface State {
   // OpenCode Zen support
   zenApiKey?: string
   zenModels?: ZenModelsResponse
-  zenMode?: boolean  // When true, proxy to Zen instead of Copilot
+  zenMode?: boolean // When true, proxy to Zen instead of Copilot
+
+  // Google Antigravity support
+  antigravityMode?: boolean // When true, proxy to Antigravity instead of Copilot
+  antigravityModels?: AntigravityModelsResponse
 }
 
 export const state: State = {
@@ -32,4 +37,5 @@ export const state: State = {
   rateLimitWait: false,
   showToken: false,
   zenMode: false,
+  antigravityMode: false,
 }

@@ -173,6 +173,7 @@ The following command line options are available for the `start` command:
 | --proxy-env    | Initialize proxy from environment variables                                   | false      | none  |
 | --zen          | Enable OpenCode Zen mode (proxy to Zen instead of GitHub Copilot)             | false      | -z    |
 | --zen-api-key  | OpenCode Zen API key (get from https://opencode.ai/zen)                       | none       | none  |
+| --antigravity  | Enable Google Antigravity mode (proxy to Antigravity)                         | false      | none  |
 
 ### Auth Command Options
 
@@ -488,6 +489,83 @@ You can also access dedicated Zen routes (always available):
 | `POST /zen/v1/chat/completions`  | Zen chat completions     |
 | `POST /zen/v1/messages`          | Zen messages             |
 | `GET /zen/v1/models`             | Zen models               |
+
+## Using with Google Antigravity
+
+### Google Antigravity 使用指南
+
+Google Antigravity 是 Google 内部的 AI API 服务，支持 Gemini、Claude 等模型。Copilot API Plus 支持将 Antigravity 转换为 OpenAI 兼容 API。
+
+> **注意**：Antigravity 需要 Google 账户授权，基于 OAuth 认证。
+
+#### 1. 启动 Antigravity 模式
+
+首次运行会引导你完成 Google OAuth 认证：
+
+```sh
+npx copilot-api-plus@latest start --antigravity
+```
+
+按照提示：
+1. 打开生成的 Google 授权 URL
+2. 完成 Google 登录
+3. 复制回调 URL 粘贴到终端
+
+#### 2. 支持的模型
+
+| 模型                              | ID                                    | 说明            |
+| --------------------------------- | ------------------------------------- | --------------- |
+| Gemini 2.5 Pro                    | gemini-2.5-pro-exp-03-25              | Google Gemini   |
+| Gemini 2.5 Pro Preview            | gemini-2.5-pro-preview-05-06          | Google Gemini   |
+| Gemini 2.0 Flash                  | gemini-2.0-flash-exp                  | Google Gemini   |
+| Gemini 2.0 Flash Thinking         | gemini-2.0-flash-thinking-exp         | 支持思考链      |
+| Gemini 2.0 Pro                    | gemini-2.0-pro-exp-02-05              | Google Gemini   |
+| Claude Opus 4.5                   | claude-opus-4-5                       | Anthropic Claude|
+| Claude Sonnet 4.5                 | claude-sonnet-4-5                     | Anthropic Claude|
+
+启动时会自动显示可用模型列表。
+
+#### 3. 与 Claude Code 配合
+
+```sh
+npx copilot-api-plus@latest start --antigravity --claude-code
+```
+
+会自动生成 Claude Code 启动命令。
+
+#### 4. API 路径
+
+Antigravity 模式下：
+
+| 路径                              | 说明                         |
+| --------------------------------- | ---------------------------- |
+| `POST /v1/chat/completions`       | OpenAI 兼容聊天补全          |
+| `POST /v1/messages`               | Anthropic 兼容消息 API       |
+| `GET /v1/models`                  | 模型列表                     |
+
+Antigravity 专属路径（始终可用）：
+
+| 路径                                      | 说明               |
+| ----------------------------------------- | ------------------ |
+| `POST /antigravity/v1/chat/completions`   | Antigravity 聊天   |
+| `POST /antigravity/v1/messages`           | Antigravity 消息   |
+| `GET /antigravity/v1/models`              | Antigravity 模型   |
+
+#### 5. 账户管理
+
+- **账户存储位置**：`~/.local/share/copilot-api-plus/antigravity-accounts.json`
+- **清除账户**：
+  ```sh
+  npx copilot-api-plus@latest logout --antigravity
+  ```
+- **支持多账户**：可添加多个 Google 账户，自动轮换
+
+#### 6. 特性
+
+- 自动 Token 刷新
+- 多账户支持与自动轮换
+- 配额用尽自动切换账户
+- 支持 Thinking 模型（思考链输出）
 
 ## Using with Claude Code
 

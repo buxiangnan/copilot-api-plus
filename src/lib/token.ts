@@ -48,12 +48,14 @@ export const setupCopilotToken = async () => {
       }
     } catch (error) {
       consola.error("Failed to refresh Copilot token:", error)
-      
+
       // If we get a 401, the GitHub token might be invalid
       // Log the error but don't crash - the next API request will fail
       // and the user can restart with valid credentials
       if (error instanceof HTTPError && error.response.status === 401) {
-        consola.warn("GitHub token may have been revoked. Please restart and re-authenticate.")
+        consola.warn(
+          "GitHub token may have been revoked. Please restart and re-authenticate.",
+        )
         state.copilotToken = undefined
       }
       // Don't throw here - it would cause an unhandled rejection in setInterval
@@ -99,7 +101,7 @@ export async function setupGitHubToken(
       if (state.showToken) {
         consola.info("GitHub token:", githubToken)
       }
-      
+
       // Validate the token by checking if we can get the user
       try {
         await logUser()
@@ -107,7 +109,9 @@ export async function setupGitHubToken(
       } catch (error) {
         // Token is invalid or expired, clear it and re-authenticate
         if (error instanceof HTTPError && error.response.status === 401) {
-          consola.warn("Stored GitHub token is invalid or expired, clearing and re-authenticating...")
+          consola.warn(
+            "Stored GitHub token is invalid or expired, clearing and re-authenticating...",
+          )
           await clearGithubToken()
           // Fall through to perform fresh authentication
         } else {

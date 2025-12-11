@@ -5,6 +5,7 @@
  */
 
 import consola from "consola"
+
 import { state } from "~/lib/state"
 
 export interface ZenMessageRequest {

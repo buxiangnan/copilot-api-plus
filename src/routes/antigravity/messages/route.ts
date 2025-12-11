@@ -1,7 +1,8 @@
 /**
- * OpenCode Zen Chat Completions Route
+ * Antigravity Messages Route
  *
- * Proxies OpenAI-format chat completion requests to Zen.
+ * Anthropic-compatible messages endpoint for Antigravity.
+ * This enables Claude Code to use Antigravity as backend.
  */
 
 import consola from "consola"
@@ -9,25 +10,25 @@ import { Hono } from "hono"
 
 import { state } from "~/lib/state"
 import {
-  createZenChatCompletions,
-  type ZenChatCompletionRequest,
-} from "~/services/zen/create-chat-completions"
+  createAntigravityMessages,
+  type AnthropicMessageRequest,
+} from "~/services/antigravity/create-messages"
 
-export const zenCompletionRoutes = new Hono()
+export const antigravityMessagesRoute = new Hono()
 
-zenCompletionRoutes.post("/", async (c) => {
-  if (!state.zenMode || !state.zenApiKey) {
+antigravityMessagesRoute.post("/", async (c) => {
+  if (!state.antigravityMode) {
     return c.json(
-      { error: "Zen mode is not enabled. Start with --zen flag." },
+      { error: "Antigravity mode is not enabled. Start with --antigravity flag." },
       400,
     )
   }
 
   try {
-    const body = (await c.req.json()) as ZenChatCompletionRequest
-    consola.debug("Zen chat completion request:", body.model)
+    const body = (await c.req.json()) as AnthropicMessageRequest
+    consola.debug("Antigravity message request:", body.model)
 
-    const response = await createZenChatCompletions(body)
+    const response = await createAntigravityMessages(body)
 
     // Handle streaming
     if (body.stream) {
@@ -46,12 +47,13 @@ zenCompletionRoutes.post("/", async (c) => {
     const data = await response.json()
     return c.json(data)
   } catch (error) {
-    consola.error("Zen chat completion error:", error)
+    consola.error("Antigravity message error:", error)
     return c.json(
       {
+        type: "error",
         error: {
+          type: "antigravity_error",
           message: error instanceof Error ? error.message : "Unknown error",
-          type: "zen_error",
         },
       },
       500,

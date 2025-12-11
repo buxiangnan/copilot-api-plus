@@ -1,3 +1,4 @@
+import { state } from "~/lib/state"
 import {
   type ChatCompletionResponse,
   type ChatCompletionsPayload,
@@ -7,8 +8,6 @@ import {
   type Tool,
   type ToolCall,
 } from "~/services/copilot/create-chat-completions"
-
-import { state } from "~/lib/state"
 
 import {
   type AnthropicAssistantContentBlock,
@@ -51,32 +50,32 @@ export function translateToOpenAI(
 function translateModelName(model: string): string {
   // Claude Code 发送的模型名称可能与 GitHub Copilot 支持的不一致
   // 需要智能匹配到 Copilot 实际支持的模型
-  
+
   const supportedModels = state.models?.data.map((m) => m.id) ?? []
-  
+
   // 1. 直接匹配
   if (supportedModels.includes(model)) {
     return model
   }
-  
+
   // 2. 移除日期后缀后匹配 (claude-opus-4-5-20251101 -> claude-opus-4-5)
   const modelBase = model.replace(/-\d{8}$/, "")
   if (supportedModels.includes(modelBase)) {
     return modelBase
   }
-  
+
   // 3. 尝试 4-5 -> 4.5 格式转换 (claude-opus-4-5 -> claude-opus-4.5)
   const modelWithDot = modelBase.replace(/-(\d+)-(\d+)$/, "-$1.$2")
   if (supportedModels.includes(modelWithDot)) {
     return modelWithDot
   }
-  
+
   // 4. 尝试 4.5 -> 4-5 格式转换 (claude-opus-4.5 -> claude-opus-4-5)
   const modelWithDash = model.replace(/(\d+)\.(\d+)/, "$1-$2")
   if (supportedModels.includes(modelWithDash)) {
     return modelWithDash
   }
-  
+
   // 5. Anthropic 旧格式到 Copilot 新格式映射
   // claude-3-5-sonnet-xxx -> claude-sonnet-4.5
   // claude-3-opus-xxx -> claude-opus-4.5
@@ -89,19 +88,23 @@ function translateModelName(model: string): string {
     "claude-3-5-haiku": "claude-haiku-4.5",
     "claude-3-haiku": "claude-haiku-4.5",
   }
-  
+
   for (const [oldFormat, newFormat] of Object.entries(oldFormatMapping)) {
-    if (modelBase.startsWith(oldFormat) && supportedModels.includes(newFormat)) {
+    if (
+      modelBase.startsWith(oldFormat)
+      && supportedModels.includes(newFormat)
+    ) {
       return newFormat
     }
   }
-  
+
   // 6. 回退：按模型系列查找可用模型
-  const modelFamily = model.includes("opus") ? "opus" 
+  const modelFamily =
+    model.includes("opus") ? "opus"
     : model.includes("sonnet") ? "sonnet"
     : model.includes("haiku") ? "haiku"
     : null
-    
+
   if (modelFamily) {
     const familyModel = supportedModels.find((m) => m.includes(modelFamily))
     if (familyModel) {
