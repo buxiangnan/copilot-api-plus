@@ -29,13 +29,19 @@ const ANTIGRAVITY_AUTH_FILENAME = "antigravity-accounts.json"
 // These are the same public credentials used by antigravity2api-nodejs
 // These are public OAuth client credentials embedded in the official Antigravity client
 // Obfuscated to avoid false positives from secret scanners
-const _d = (s: string) => s.split("").map((c, i) => String.fromCharCode(c.charCodeAt(0) - (i % 3))).join("")
+const _d = (s: string) =>
+  s
+    .split("")
+    .map((c, i) => String.fromCharCode(c.charCodeAt(0) - (i % 3)))
+    .join("")
 const GOOGLE_CLIENT_ID =
-  process.env.ANTIGRAVITY_CLIENT_ID ||
-  _d("9582:895427;-f:rdlg48v5nguqv4ivc9mfl1k5sl:c87.brpt0gpqgmgutgrdqnugnu0cpo")
+  process.env.ANTIGRAVITY_CLIENT_ID
+  || _d(
+    "9582:895427;-f:rdlg48v5nguqv4ivc9mfl1k5sl:c87.brpt0gpqgmgutgrdqnugnu0cpo",
+  )
 const GOOGLE_CLIENT_SECRET =
-  process.env.ANTIGRAVITY_CLIENT_SECRET ||
-  _d("GPESQZ-9fPsMZCyYWHD69k1lfXtn3ek8MCo")
+  process.env.ANTIGRAVITY_CLIENT_SECRET
+  || _d("GPESQZ-9fPsMZCyYWHD69k1lfXtn3ek8MCo")
 const GOOGLE_REDIRECT_URI = "http://localhost:8046/callback"
 
 /**

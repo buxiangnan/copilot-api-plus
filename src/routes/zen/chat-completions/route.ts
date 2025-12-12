@@ -8,10 +8,7 @@ import consola from "consola"
 import { Hono } from "hono"
 
 import { state } from "~/lib/state"
-import {
-  createZenChatCompletions,
-  type ZenChatCompletionRequest,
-} from "~/services/zen/create-chat-completions"
+import { createZenChatCompletions } from "~/services/zen/create-chat-completions"
 
 export const zenCompletionRoutes = new Hono()
 
@@ -24,7 +21,7 @@ zenCompletionRoutes.post("/", async (c) => {
   }
 
   try {
-    const body = (await c.req.json()) as ZenChatCompletionRequest
+    const body = await c.req.json()
     consola.debug("Zen chat completion request:", body.model)
 
     const response = await createZenChatCompletions(body)

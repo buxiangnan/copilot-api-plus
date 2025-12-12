@@ -5,7 +5,10 @@ import consola from "consola"
 import fs from "node:fs/promises"
 import os from "node:os"
 
+import { getProxyConfig, type ProxyConfig } from "./lib/config"
 import { PATHS } from "./lib/paths"
+import { getAntigravityAuthPath } from "./services/antigravity/auth"
+import { getZenAuthPath } from "./services/zen/auth"
 
 interface DebugInfo {
   version: string
@@ -18,8 +21,15 @@ interface DebugInfo {
   paths: {
     APP_DIR: string
     GITHUB_TOKEN_PATH: string
+    ZEN_AUTH_PATH: string
+    ANTIGRAVITY_AUTH_PATH: string
   }
-  tokenExists: boolean
+  credentials: {
+    github: boolean
+    zen: boolean
+    antigravity: boolean
+  }
+  proxy?: ProxyConfig
 }
 
 interface RunDebugOptions {
@@ -63,11 +73,30 @@ async function checkTokenExists(): Promise<boolean> {
   }
 }
 
+async function checkFileExists(path: string): Promise<boolean> {
+  try {
+    const stats = await fs.stat(path)
+    if (!stats.isFile()) return false
+
+    const content = await fs.readFile(path, "utf8")
+    return content.trim().length > 0
+  } catch {
+    return false
+  }
+}
+
 async function getDebugInfo(): Promise<DebugInfo> {
-  const [version, tokenExists] = await Promise.all([
-    getPackageVersion(),
-    checkTokenExists(),
-  ])
+  const zenAuthPath = getZenAuthPath()
+  const antigravityAuthPath = getAntigravityAuthPath()
+
+  const [version, githubExists, zenExists, antigravityExists, proxyConfig] =
+    await Promise.all([
+      getPackageVersion(),
+      checkTokenExists(),
+      checkFileExists(zenAuthPath),
+      checkFileExists(antigravityAuthPath),
+      getProxyConfig(),
+    ])
 
   return {
     version,
@@ -75,22 +104,44 @@ async function getDebugInfo(): Promise<DebugInfo> {
     paths: {
       APP_DIR: PATHS.APP_DIR,
       GITHUB_TOKEN_PATH: PATHS.GITHUB_TOKEN_PATH,
+      ZEN_AUTH_PATH: zenAuthPath,
+      ANTIGRAVITY_AUTH_PATH: antigravityAuthPath,
     },
-    tokenExists,
+    credentials: {
+      github: githubExists,
+      zen: zenExists,
+      antigravity: antigravityExists,
+    },
+    proxy: proxyConfig,
   }
 }
 
 function printDebugInfoPlain(info: DebugInfo): void {
-  consola.info(`copilot-api debug
+  let proxyStatus = "Not configured"
+  if (info.proxy) {
+    proxyStatus =
+      info.proxy.enabled ?
+        `Enabled (${info.proxy.httpProxy || info.proxy.httpsProxy})`
+      : "Disabled"
+  }
+
+  consola.info(`copilot-api-plus debug
 
 Version: ${info.version}
 Runtime: ${info.runtime.name} ${info.runtime.version} (${info.runtime.platform} ${info.runtime.arch})
 
 Paths:
-- APP_DIR: ${info.paths.APP_DIR}
-- GITHUB_TOKEN_PATH: ${info.paths.GITHUB_TOKEN_PATH}
+  APP_DIR: ${info.paths.APP_DIR}
+  GITHUB_TOKEN_PATH: ${info.paths.GITHUB_TOKEN_PATH}
+  ZEN_AUTH_PATH: ${info.paths.ZEN_AUTH_PATH}
+  ANTIGRAVITY_AUTH_PATH: ${info.paths.ANTIGRAVITY_AUTH_PATH}
 
-Token exists: ${info.tokenExists ? "Yes" : "No"}`)
+Credentials:
+  GitHub Copilot: ${info.credentials.github ? "✅ Configured" : "❌ Not configured"}
+  OpenCode Zen: ${info.credentials.zen ? "✅ Configured" : "❌ Not configured"}
+  Google Antigravity: ${info.credentials.antigravity ? "✅ Configured" : "❌ Not configured"}
+
+Proxy: ${proxyStatus}`)
 }
 
 function printDebugInfoJson(info: DebugInfo): void {

@@ -9,23 +9,23 @@ import consola from "consola"
 import { Hono } from "hono"
 
 import { state } from "~/lib/state"
-import {
-  createAntigravityMessages,
-  type AnthropicMessageRequest,
-} from "~/services/antigravity/create-messages"
+import { createAntigravityMessages } from "~/services/antigravity/create-messages"
 
 export const antigravityMessagesRoute = new Hono()
 
 antigravityMessagesRoute.post("/", async (c) => {
   if (!state.antigravityMode) {
     return c.json(
-      { error: "Antigravity mode is not enabled. Start with --antigravity flag." },
+      {
+        error:
+          "Antigravity mode is not enabled. Start with --antigravity flag.",
+      },
       400,
     )
   }
 
   try {
-    const body = (await c.req.json()) as AnthropicMessageRequest
+    const body = await c.req.json()
     consola.debug("Antigravity message request:", body.model)
 
     const response = await createAntigravityMessages(body)

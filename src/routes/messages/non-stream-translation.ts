@@ -99,11 +99,14 @@ function translateModelName(model: string): string {
   }
 
   // 6. 回退：按模型系列查找可用模型
-  const modelFamily =
-    model.includes("opus") ? "opus"
-    : model.includes("sonnet") ? "sonnet"
-    : model.includes("haiku") ? "haiku"
-    : null
+  let modelFamily: string | null = null
+  if (model.includes("opus")) {
+    modelFamily = "opus"
+  } else if (model.includes("sonnet")) {
+    modelFamily = "sonnet"
+  } else if (model.includes("haiku")) {
+    modelFamily = "haiku"
+  }
 
   if (modelFamily) {
     const familyModel = supportedModels.find((m) => m.includes(modelFamily))

@@ -9,7 +9,11 @@
 
 import consola from "consola"
 
-import { disableCurrentAccount, getValidAccessToken, rotateAccount } from "./auth"
+import {
+  disableCurrentAccount,
+  getValidAccessToken,
+  rotateAccount,
+} from "./auth"
 import { isThinkingModel } from "./get-models"
 
 // Antigravity API endpoints
@@ -31,24 +35,24 @@ export interface AnthropicMessage {
 
 export interface AnthropicMessageRequest {
   model: string
-  messages: AnthropicMessage[]
+  messages: Array<AnthropicMessage>
   system?: string
   max_tokens: number
   stream?: boolean
   temperature?: number
   top_p?: number
   top_k?: number
-  tools?: unknown[]
+  tools?: Array<unknown>
 }
 
 /**
  * Convert Anthropic messages to Antigravity format
  */
 function convertMessages(
-  messages: AnthropicMessage[],
+  messages: Array<AnthropicMessage>,
   system?: string,
-): { contents: unknown[]; systemInstruction?: unknown } {
-  const contents: unknown[] = []
+): { contents: Array<unknown>; systemInstruction?: unknown } {
+  const contents: Array<unknown> = []
   let systemInstruction: unknown = undefined
 
   // Handle system message
@@ -69,7 +73,7 @@ function convertMessages(
       })
     } else {
       // Handle array content (multimodal)
-      const parts: unknown[] = []
+      const parts: Array<unknown> = []
 
       for (const block of message.content) {
         if (block.type === "text" && block.text) {
@@ -97,7 +101,7 @@ function convertMessages(
 /**
  * Convert tools to Antigravity format
  */
-function convertTools(tools?: unknown[]): unknown[] | undefined {
+function convertTools(tools?: Array<unknown>): Array<unknown> | undefined {
   if (!tools || tools.length === 0) {
     return undefined
   }
@@ -181,9 +185,8 @@ export async function createAntigravityMessages(
     }
   }
 
-  const endpoint = request.stream
-    ? ANTIGRAVITY_STREAM_URL
-    : ANTIGRAVITY_NO_STREAM_URL
+  const endpoint =
+    request.stream ? ANTIGRAVITY_STREAM_URL : ANTIGRAVITY_NO_STREAM_URL
 
   consola.debug(
     `Antigravity messages request to ${endpoint} with model ${request.model}`,
@@ -300,7 +303,9 @@ function transformStreamToAnthropic(
         },
       }
       controller.enqueue(
-        encoder.encode(`event: message_start\ndata: ${JSON.stringify(messageStart)}\n\n`),
+        encoder.encode(
+          `event: message_start\ndata: ${JSON.stringify(messageStart)}\n\n`,
+        ),
       )
 
       try {
@@ -311,7 +316,9 @@ function transformStreamToAnthropic(
             // Send message_stop event
             const messageStop = { type: "message_stop" }
             controller.enqueue(
-              encoder.encode(`event: message_stop\ndata: ${JSON.stringify(messageStop)}\n\n`),
+              encoder.encode(
+                `event: message_stop\ndata: ${JSON.stringify(messageStop)}\n\n`,
+              ),
             )
             controller.close()
             break

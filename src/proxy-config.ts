@@ -3,9 +3,10 @@
  * Allows users to configure, enable, disable, and view proxy settings
  */
 
+import * as p from "@clack/prompts"
 import { defineCommand } from "citty"
 import consola from "consola"
-import * as p from "@clack/prompts"
+
 import {
   getProxyConfig,
   saveProxyConfig,
@@ -62,14 +63,26 @@ export const proxy = defineCommand({
     await ensurePaths()
 
     // Show current configuration
-    if (args.show || (!args.set && !args.enable && !args.disable && !args.clear && !args["http-proxy"] && !args["https-proxy"])) {
+    if (
+      args.show
+      || (!args.set
+        && !args.enable
+        && !args.disable
+        && !args.clear
+        && !args["http-proxy"]
+        && !args["https-proxy"])
+    ) {
       const config = await getProxyConfig()
       if (!config) {
         consola.info("No proxy configuration saved.")
         consola.info("")
         consola.info("To configure proxy, use one of:")
-        consola.info("  copilot-api-plus proxy --set                    # Interactive setup")
-        consola.info("  copilot-api-plus proxy --http-proxy http://proxy:8080  # Direct set")
+        consola.info(
+          "  copilot-api-plus proxy --set                    # Interactive setup",
+        )
+        consola.info(
+          "  copilot-api-plus proxy --http-proxy http://proxy:8080  # Direct set",
+        )
         return
       }
 
@@ -98,7 +111,9 @@ export const proxy = defineCommand({
     if (args.enable) {
       const config = await getProxyConfig()
       if (!config) {
-        consola.error("No proxy configuration saved. Use --set to configure first.")
+        consola.error(
+          "No proxy configuration saved. Use --set to configure first.",
+        )
         return
       }
       config.enabled = true

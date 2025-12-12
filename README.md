@@ -507,11 +507,14 @@ curl http://localhost:4141/v1/messages \
 
 ### logout 命令参数
 
-| 参数 | 说明 |
-|------|------|
-| `--zen` | 仅清除 Zen 凭证 |
-| `--antigravity` | 仅清除 Antigravity 凭证 |
-| `--all` | 清除所有凭证 |
+| 参数 | 别名 | 说明 |
+|------|------|------|
+| `--github` | `-g` | 仅清除 GitHub Copilot 凭证 |
+| `--zen` | `-z` | 仅清除 Zen 凭证 |
+| `--antigravity` | - | 仅清除 Antigravity 凭证 |
+| `--all` | `-a` | 清除所有凭证 |
+
+> **提示**：不带参数运行 `logout` 会显示交互式菜单供选择。
 
 ---
 
@@ -582,8 +585,13 @@ docker run -p 4141:4141 \
 ### 切换账户
 
 ```bash
-# 清除 GitHub 凭证
+# 交互式选择要清除的凭证
 npx copilot-api-plus@latest logout
+
+# 仅清除 GitHub Copilot 凭证
+npx copilot-api-plus@latest logout --github
+# 或简写
+npx copilot-api-plus@latest logout -g
 
 # 清除 Zen 凭证
 npx copilot-api-plus@latest logout --zen

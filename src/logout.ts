@@ -12,6 +12,7 @@ import {
 import { clearZenAuth, getZenAuthPath } from "./services/zen/auth"
 
 export async function runLogout(options: {
+  github?: boolean
   zen?: boolean
   antigravity?: boolean
   all?: boolean
@@ -27,6 +28,14 @@ export async function runLogout(options: {
     consola.info(`GitHub token: ${PATHS.GITHUB_TOKEN_PATH}`)
     consola.info(`Zen API key: ${getZenAuthPath()}`)
     consola.info(`Antigravity accounts: ${getAntigravityAuthPath()}`)
+    return
+  }
+
+  if (options.github) {
+    // Clear only GitHub token
+    await clearGithubToken()
+    consola.success("Logged out from GitHub Copilot")
+    consola.info(`Token file location: ${PATHS.GITHUB_TOKEN_PATH}`)
     return
   }
 
@@ -100,6 +109,12 @@ export const logout = defineCommand({
     description: "Clear stored credentials and logout",
   },
   args: {
+    github: {
+      alias: "g",
+      type: "boolean",
+      default: false,
+      description: "Clear only GitHub Copilot token",
+    },
     zen: {
       alias: "z",
       type: "boolean",
@@ -120,6 +135,7 @@ export const logout = defineCommand({
   },
   run({ args }) {
     return runLogout({
+      github: args.github,
       zen: args.zen,
       antigravity: args.antigravity,
       all: args.all,

@@ -58,7 +58,7 @@ interface RunServerOptions {
 export async function runServer(options: RunServerOptions): Promise<void> {
   // Apply saved proxy configuration first (if any)
   const savedProxyApplied = await applyProxyConfig()
-  
+
   // Then apply --proxy-env if specified (overrides saved config)
   if (options.proxyEnv) {
     initProxyFromEnv()
@@ -203,10 +203,12 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   const serverUrl = `http://localhost:${options.port}`
 
   if (options.claudeCode) {
-    const models =
-      state.zenMode ? state.zenModels
-      : state.antigravityMode ? state.antigravityModels
-      : state.models
+    let models = state.models
+    if (state.zenMode) {
+      models = state.zenModels
+    } else if (state.antigravityMode) {
+      models = state.antigravityModels
+    }
     invariant(models, "Models should be loaded by now")
 
     const selectedModel = await consola.prompt(
