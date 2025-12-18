@@ -1,3 +1,5 @@
+import type { Context } from "hono"
+
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { logger } from "hono/logger"
@@ -25,79 +27,90 @@ server.use(apiKeyAuthMiddleware)
 
 server.get("/", (c) => c.text("Server running"))
 
-// Dynamic routing based on mode (Zen / Antigravity / Copilot)
-server.route(
-  "/chat/completions",
-  new Hono().all("*", async (c, _next) => {
-    if (state.zenMode) {
-      return zenCompletionRoutes.fetch(c.req.raw, c.env)
-    }
-    if (state.antigravityMode) {
-      return antigravityChatCompletionsRoute.fetch(c.req.raw, c.env)
-    }
-    return completionRoutes.fetch(c.req.raw, c.env)
-  }),
-)
+// Helper to create a new request with modified path for sub-routing
+function createSubRequest(c: Context, basePath: string): Request {
+  const url = new URL(c.req.url)
+  // Remove the base path prefix to get the sub-path
+  const subPath = url.pathname.slice(basePath.length) || "/"
+  url.pathname = subPath
+  return new Request(url.toString(), c.req.raw)
+}
 
-server.route(
-  "/models",
-  new Hono().all("*", async (c, _next) => {
-    if (state.zenMode) {
-      return zenModelRoutes.fetch(c.req.raw, c.env)
-    }
-    if (state.antigravityMode) {
-      return antigravityModelsRoute.fetch(c.req.raw, c.env)
-    }
-    return modelRoutes.fetch(c.req.raw, c.env)
-  }),
-)
+// Dynamic routing based on mode (Zen / Antigravity / Copilot)
+// Chat completions
+server.all("/chat/completions/*", async (c) => {
+  const req = createSubRequest(c, "/chat/completions")
+  if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  return completionRoutes.fetch(req, c.env)
+})
+server.all("/chat/completions", async (c) => {
+  const req = createSubRequest(c, "/chat/completions")
+  if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  return completionRoutes.fetch(req, c.env)
+})
+
+// Models
+server.all("/models/*", async (c) => {
+  const req = createSubRequest(c, "/models")
+  if (state.zenMode) return zenModelRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityModelsRoute.fetch(req, c.env)
+  return modelRoutes.fetch(req, c.env)
+})
+server.all("/models", async (c) => {
+  const req = createSubRequest(c, "/models")
+  if (state.zenMode) return zenModelRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityModelsRoute.fetch(req, c.env)
+  return modelRoutes.fetch(req, c.env)
+})
 
 server.route("/embeddings", embeddingRoutes)
 server.route("/usage", usageRoute)
 server.route("/token", tokenRoute)
 
 // Compatibility with tools that expect v1/ prefix
-server.route(
-  "/v1/chat/completions",
-  new Hono().all("*", async (c, _next) => {
-    if (state.zenMode) {
-      return zenCompletionRoutes.fetch(c.req.raw, c.env)
-    }
-    if (state.antigravityMode) {
-      return antigravityChatCompletionsRoute.fetch(c.req.raw, c.env)
-    }
-    return completionRoutes.fetch(c.req.raw, c.env)
-  }),
-)
+server.all("/v1/chat/completions/*", async (c) => {
+  const req = createSubRequest(c, "/v1/chat/completions")
+  if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  return completionRoutes.fetch(req, c.env)
+})
+server.all("/v1/chat/completions", async (c) => {
+  const req = createSubRequest(c, "/v1/chat/completions")
+  if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  return completionRoutes.fetch(req, c.env)
+})
 
-server.route(
-  "/v1/models",
-  new Hono().all("*", async (c, _next) => {
-    if (state.zenMode) {
-      return zenModelRoutes.fetch(c.req.raw, c.env)
-    }
-    if (state.antigravityMode) {
-      return antigravityModelsRoute.fetch(c.req.raw, c.env)
-    }
-    return modelRoutes.fetch(c.req.raw, c.env)
-  }),
-)
+server.all("/v1/models/*", async (c) => {
+  const req = createSubRequest(c, "/v1/models")
+  if (state.zenMode) return zenModelRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityModelsRoute.fetch(req, c.env)
+  return modelRoutes.fetch(req, c.env)
+})
+server.all("/v1/models", async (c) => {
+  const req = createSubRequest(c, "/v1/models")
+  if (state.zenMode) return zenModelRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityModelsRoute.fetch(req, c.env)
+  return modelRoutes.fetch(req, c.env)
+})
 
 server.route("/v1/embeddings", embeddingRoutes)
 
 // Anthropic compatible endpoints
-server.route(
-  "/v1/messages",
-  new Hono().all("*", async (c, _next) => {
-    if (state.zenMode) {
-      return zenMessageRoutes.fetch(c.req.raw, c.env)
-    }
-    if (state.antigravityMode) {
-      return antigravityMessagesRoute.fetch(c.req.raw, c.env)
-    }
-    return messageRoutes.fetch(c.req.raw, c.env)
-  }),
-)
+server.all("/v1/messages/*", async (c) => {
+  const req = createSubRequest(c, "/v1/messages")
+  if (state.zenMode) return zenMessageRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityMessagesRoute.fetch(req, c.env)
+  return messageRoutes.fetch(req, c.env)
+})
+server.all("/v1/messages", async (c) => {
+  const req = createSubRequest(c, "/v1/messages")
+  if (state.zenMode) return zenMessageRoutes.fetch(req, c.env)
+  if (state.antigravityMode) return antigravityMessagesRoute.fetch(req, c.env)
+  return messageRoutes.fetch(req, c.env)
+})
 
 // Dedicated Zen routes (always available)
 server.route("/zen/v1/chat/completions", zenCompletionRoutes)
