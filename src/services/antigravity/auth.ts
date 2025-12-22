@@ -5,7 +5,6 @@
  * Supports multiple accounts with auto-rotation and token refresh.
  */
 
-/* eslint-disable unicorn/prefer-code-point */
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unnecessary-condition */
 
@@ -29,24 +28,71 @@ export interface AntigravityAuth {
 
 const ANTIGRAVITY_AUTH_FILENAME = "antigravity-accounts.json"
 
-// Google OAuth credentials
-// These are the same public credentials used by antigravity2api-nodejs
-// These are public OAuth client credentials embedded in the official Antigravity client
-// Obfuscated to avoid false positives from secret scanners
-const _d = (s: string) =>
-  s
-    .split("")
-    .map((c, i) => String.fromCharCode(c.charCodeAt(0) - (i % 3)))
-    .join("")
-const GOOGLE_CLIENT_ID =
-  process.env.ANTIGRAVITY_CLIENT_ID
-  || _d(
-    "9582:895427;-f:rdlg48v5nguqv4ivc9mfl1k5sl:c87.brpt0gpqgmgutgrdqnugnu0cpo",
-  )
-const GOOGLE_CLIENT_SECRET =
-  process.env.ANTIGRAVITY_CLIENT_SECRET
-  || _d("GPESQZ-9fPsMZCyYWHD69k1lfXtn3ek8MCo")
+// ============================================
+// Authentication Methods (choose one):
+// ============================================
+//
+// Method 1: API Key (Recommended - Simplest)
+//   Set environment variable: GEMINI_API_KEY
+//   Get your API key from: https://aistudio.google.com/apikey
+//
+// Method 2: OAuth Credentials
+//   Set environment variables:
+//     ANTIGRAVITY_CLIENT_ID - Google OAuth Client ID
+//     ANTIGRAVITY_CLIENT_SECRET - Google OAuth Client Secret
+//
+//   If you get "invalid_client" error, create your own OAuth app:
+//   1. Go to https://console.cloud.google.com/apis/credentials
+//   2. Create OAuth 2.0 Client ID (Desktop app or Web app type)
+//   3. Add redirect URI: http://localhost:8046/callback
+//   4. Set environment variables with your credentials
+// ============================================
+
+// API Key authentication (simplest method)
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || ""
+
+/**
+ * Check if API Key authentication is available
+ */
+export function hasApiKey(): boolean {
+  return GEMINI_API_KEY.length > 0
+}
+
+/**
+ * Get API Key for authentication
+ */
+export function getApiKey(): string | null {
+  return GEMINI_API_KEY || null
+}
+
+// Default OAuth credentials (from reference projects: gcli2api, antigravity2api-nodejs, Antigravity-Manager)
+const DEFAULT_CLIENT_ID = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
+const DEFAULT_CLIENT_SECRET = "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"
+
+// OAuth credentials - can be set via env, CLI, or defaults
+let GOOGLE_CLIENT_ID =
+  process.env.ANTIGRAVITY_CLIENT_ID || DEFAULT_CLIENT_ID
+let GOOGLE_CLIENT_SECRET =
+  process.env.ANTIGRAVITY_CLIENT_SECRET || DEFAULT_CLIENT_SECRET
 const GOOGLE_REDIRECT_URI = "http://localhost:8046/callback"
+
+// OAuth scopes required for Antigravity API access
+const OAUTH_SCOPES = [
+  "https://www.googleapis.com/auth/cloud-platform",
+  "https://www.googleapis.com/auth/userinfo.email",
+  "https://www.googleapis.com/auth/userinfo.profile",
+  "https://www.googleapis.com/auth/cclog",
+  "https://www.googleapis.com/auth/experimentsandconfigs",
+]
+
+/**
+ * Set OAuth credentials from CLI arguments
+ * This overrides environment variables and defaults
+ */
+export function setOAuthCredentials(clientId: string, clientSecret: string): void {
+  GOOGLE_CLIENT_ID = clientId
+  GOOGLE_CLIENT_SECRET = clientSecret
+}
 
 /**
  * Get the path to the Antigravity auth file
@@ -311,9 +357,10 @@ export function getOAuthUrl(): string {
     client_id: GOOGLE_CLIENT_ID,
     redirect_uri: GOOGLE_REDIRECT_URI,
     response_type: "code",
-    scope: "openid email profile",
+    scope: OAUTH_SCOPES.join(" "),
     access_type: "offline",
     prompt: "consent",
+    include_granted_scopes: "true",
   })
 
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`
@@ -367,9 +414,62 @@ export async function exchangeCodeForTokens(
 }
 
 /**
- * Setup Antigravity interactively
+ * Start a local OAuth callback server and wait for authorization
+ * This provides a seamless web-based login experience
  */
-export async function setupAntigravity(): Promise<void> {
+async function startOAuthCallbackServer(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const server = Bun.serve({
+      port: 8046,
+      async fetch(req) {
+        const url = new URL(req.url)
+
+        if (url.pathname === "/callback") {
+          const code = url.searchParams.get("code")
+          const error = url.searchParams.get("error")
+
+          if (error) {
+            // Close server after a short delay
+            setTimeout(() => server.stop(), 100)
+            reject(new Error(`OAuth error: ${error}`))
+            return new Response(
+              `<html><body><h1>Authorization Failed</h1><p>Error: ${error}</p><p>You can close this window.</p></body></html>`,
+              { headers: { "Content-Type": "text/html" } }
+            )
+          }
+
+          if (code) {
+            // Close server after a short delay
+            setTimeout(() => server.stop(), 100)
+            resolve(code)
+            return new Response(
+              `<html><body><h1>Authorization Successful!</h1><p>You can close this window and return to the terminal.</p></body></html>`,
+              { headers: { "Content-Type": "text/html" } }
+            )
+          }
+
+          return new Response("Missing authorization code", { status: 400 })
+        }
+
+        return new Response("Not found", { status: 404 })
+      },
+    })
+
+    consola.info(`OAuth callback server started on http://localhost:8046`)
+
+    // Timeout after 5 minutes
+    setTimeout(() => {
+      server.stop()
+      reject(new Error("OAuth timeout - no callback received within 5 minutes"))
+    }, 5 * 60 * 1000)
+  })
+}
+
+/**
+ * Setup Antigravity with web-based OAuth flow
+ * Opens browser for login and automatically captures the callback
+ */
+export async function setupAntigravityWeb(): Promise<void> {
   const auth = await loadAntigravityAuth()
 
   if (auth && auth.accounts.length > 0) {
@@ -389,8 +489,77 @@ export async function setupAntigravity(): Promise<void> {
   }
 
   consola.info("")
-  consola.info("Google Antigravity OAuth Setup")
-  consola.info("==============================")
+  consola.info("Google Antigravity OAuth Setup (Web Flow)")
+  consola.info("=========================================")
+  consola.info("")
+
+  const oauthUrl = getOAuthUrl()
+  consola.info("Opening browser for Google login...")
+  consola.info(`If browser doesn't open, visit: ${oauthUrl}`)
+  consola.info("")
+
+  // Try to open browser automatically
+  try {
+    const { exec } = await import("node:child_process")
+    const platform = process.platform
+
+    if (platform === "win32") {
+      exec(`start "" "${oauthUrl}"`)
+    } else if (platform === "darwin") {
+      exec(`open "${oauthUrl}"`)
+    } else {
+      exec(`xdg-open "${oauthUrl}"`)
+    }
+  } catch {
+    consola.warn("Could not open browser automatically")
+  }
+
+  consola.info("Waiting for authorization...")
+
+  try {
+    const code = await startOAuthCallbackServer()
+
+    consola.info("Authorization code received, exchanging for tokens...")
+
+    const account = await exchangeCodeForTokens(code)
+
+    if (!account) {
+      throw new Error("Failed to exchange authorization code")
+    }
+
+    await addAntigravityAccount(account)
+    consola.success("Antigravity account added successfully!")
+  } catch (error) {
+    consola.error("OAuth flow failed:", error)
+    throw error
+  }
+}
+
+/**
+ * Setup Antigravity interactively (manual URL copy method)
+ */
+export async function setupAntigravityManual(): Promise<void> {
+  const auth = await loadAntigravityAuth()
+
+  if (auth && auth.accounts.length > 0) {
+    const enabledCount = auth.accounts.filter((a) => a.enable).length
+    consola.info(
+      `Found ${auth.accounts.length} Antigravity accounts (${enabledCount} enabled)`,
+    )
+
+    const addMore = await consola.prompt("Add another account?", {
+      type: "confirm",
+      initial: false,
+    })
+
+    if (!addMore) {
+      return
+    }
+  }
+
+  consola.info("")
+  consola.info("Google Antigravity OAuth Setup (Manual)")
+  consola.info("=======================================")
   consola.info("")
   consola.info("You need to authorize with Google to use Antigravity API.")
   consola.info("Please follow these steps:")
@@ -429,4 +598,24 @@ export async function setupAntigravity(): Promise<void> {
 
   await addAntigravityAccount(account)
   consola.success("Antigravity account added successfully!")
+}
+
+/**
+ * Setup Antigravity interactively
+ * Offers choice between web-based and manual OAuth flow
+ */
+export async function setupAntigravity(): Promise<void> {
+  const method = await consola.prompt("Choose OAuth login method:", {
+    type: "select",
+    options: [
+      { value: "web", label: "Web (auto-open browser, recommended)" },
+      { value: "manual", label: "Manual (copy/paste callback URL)" },
+    ],
+  })
+
+  if (method === "web") {
+    await setupAntigravityWeb()
+  } else {
+    await setupAntigravityManual()
+  }
 }

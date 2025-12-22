@@ -1,7 +1,11 @@
 /**
  * Google Antigravity Chat Completions
  *
- * Proxy chat completion requests to Google Antigravity API.
+ * Proxy chat completion requests to Google Antigravity API or standard Gemini API.
+ * Supports two authentication methods:
+ * - API Key: Uses standard Gemini API (generativelanguage.googleapis.com)
+ * - OAuth: Uses Antigravity private API (daily-cloudcode-pa.sandbox.googleapis.com)
+ *
  * Based on: https://github.com/liuw1535/antigravity2api-nodejs
  */
 
@@ -14,6 +18,7 @@ import consola from "consola"
 
 import {
   disableCurrentAccount,
+  getApiKey,
   getValidAccessToken,
   rotateAccount,
 } from "./auth"
@@ -27,17 +32,24 @@ import {
   type StreamState,
 } from "./stream-parser"
 
-// Antigravity API endpoints
+// Antigravity API endpoints (OAuth authentication)
 const ANTIGRAVITY_API_HOST = "daily-cloudcode-pa.sandbox.googleapis.com"
 const ANTIGRAVITY_STREAM_URL = `https://${ANTIGRAVITY_API_HOST}/v1internal:streamGenerateContent?alt=sse`
 const ANTIGRAVITY_NO_STREAM_URL = `https://${ANTIGRAVITY_API_HOST}/v1internal:generateContent`
 const ANTIGRAVITY_USER_AGENT = "antigravity/1.11.3 windows/amd64"
 
+// Standard Gemini API endpoints (API Key authentication)
+const GEMINI_API_HOST = "generativelanguage.googleapis.com"
+const getGeminiStreamUrl = (model: string, apiKey: string) =>
+  `https://${GEMINI_API_HOST}/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`
+const getGeminiNoStreamUrl = (model: string, apiKey: string) =>
+  `https://${GEMINI_API_HOST}/v1beta/models/${model}:generateContent?key=${apiKey}`
+
 export interface ChatMessage {
   role: "system" | "user" | "assistant"
   content:
-    | string
-    | Array<{ type: string; text?: string; image_url?: { url: string } }>
+  | string
+  | Array<{ type: string; text?: string; image_url?: { url: string } }>
 }
 
 export interface ChatCompletionRequest {
@@ -200,21 +212,78 @@ function createErrorResponse(
 }
 
 /**
- * Create chat completion with Antigravity
+ * Create chat completion with Antigravity or standard Gemini API
+ * Priority: API Key > OAuth
  */
 export async function createAntigravityChatCompletion(
   request: ChatCompletionRequest,
 ): Promise<Response> {
-  const accessToken = await getValidAccessToken()
+  // Try API Key authentication first (simplest)
+  const apiKey = getApiKey()
+  if (apiKey) {
+    return await createWithApiKey(request, apiKey)
+  }
 
+  // Fall back to OAuth authentication
+  const accessToken = await getValidAccessToken()
   if (!accessToken) {
     return createErrorResponse(
-      "No valid Antigravity access token available. Please run login first.",
+      "No valid authentication available. Please set GEMINI_API_KEY environment variable or run OAuth login.",
       "auth_error",
       401,
     )
   }
 
+  return await createWithOAuth(request, accessToken)
+}
+
+/**
+ * Create chat completion using API Key (standard Gemini API)
+ */
+async function createWithApiKey(
+  request: ChatCompletionRequest,
+  apiKey: string,
+): Promise<Response> {
+  const endpoint = request.stream
+    ? getGeminiStreamUrl(request.model, apiKey)
+    : getGeminiNoStreamUrl(request.model, apiKey)
+  const body = buildRequestBody(request)
+
+  consola.debug(`Gemini API request with model ${request.model}`)
+
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+      return await handleApiError(response)
+    }
+
+    return request.stream
+      ? transformStreamResponse(response, request.model)
+      : await transformNonStreamResponse(response, request.model)
+  } catch (error) {
+    consola.error("Gemini API request error:", error)
+    return createErrorResponse(
+      `Request failed: ${String(error)}`,
+      "request_error",
+      500,
+    )
+  }
+}
+
+/**
+ * Create chat completion using OAuth (Antigravity private API)
+ */
+async function createWithOAuth(
+  request: ChatCompletionRequest,
+  accessToken: string,
+): Promise<Response> {
   const endpoint =
     request.stream ? ANTIGRAVITY_STREAM_URL : ANTIGRAVITY_NO_STREAM_URL
   const body = buildRequestBody(request)
@@ -240,8 +309,8 @@ export async function createAntigravityChatCompletion(
       return await handleApiError(response)
     }
 
-    return request.stream ?
-        transformStreamResponse(response, request.model)
+    return request.stream
+      ? transformStreamResponse(response, request.model)
       : await transformNonStreamResponse(response, request.model)
   } catch (error) {
     consola.error("Antigravity request error:", error)

@@ -3,13 +3,17 @@ import { HTTPError } from "~/lib/error"
 import { state } from "~/lib/state"
 
 export const getModels = async () => {
-  const response = await fetch(`${copilotBaseUrl(state)}/models`, {
+  const url = `${copilotBaseUrl(state)}/models`
+
+  const response = await fetch(url, {
     headers: copilotHeaders(state),
   })
 
   if (!response.ok) throw new HTTPError("Failed to get models", response)
 
-  return (await response.json()) as ModelsResponse
+  const data = (await response.json()) as ModelsResponse
+
+  return data
 }
 
 export interface ModelsResponse {
@@ -51,5 +55,10 @@ export interface Model {
   policy?: {
     state: string
     terms: string
+  }
+  billing?: {
+    is_premium: boolean
+    multiplier: number
+    restricted_to?: Array<string>
   }
 }

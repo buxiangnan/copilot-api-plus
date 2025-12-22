@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Load environment variables from .env file
+import "dotenv/config"
+
 /* eslint-disable require-atomic-updates */
 /* eslint-disable max-lines-per-function */
 /* eslint-disable complexity */
@@ -34,6 +37,8 @@ interface RunServerOptions {
   zen: boolean
   zenApiKey?: string
   antigravity: boolean
+  antigravityClientId?: string
+  antigravityClientSecret?: string
 }
 
 /**
@@ -58,6 +63,9 @@ interface RunServerOptions {
  *   - apiKeys: Optional list of API keys to enable API key authentication
  *   - zen: Enable OpenCode Zen mode (proxy to Zen instead of GitHub Copilot)
  *   - zenApiKey: OpenCode Zen API key (optional; if omitted will prompt for setup)
+ *   - antigravity: Enable Google Antigravity mode
+ *   - antigravityClientId: Google OAuth Client ID (optional; overrides env/default)
+ *   - antigravityClientSecret: Google OAuth Client Secret (optional; overrides env/default)
  */
 export async function runServer(options: RunServerOptions): Promise<void> {
   // Apply saved proxy configuration first (if any)
@@ -131,24 +139,54 @@ export async function runServer(options: RunServerOptions): Promise<void> {
     consola.info("Google Antigravity mode enabled")
     state.antigravityMode = true
 
-    // Setup Antigravity accounts
-    const { loadAntigravityAuth, setupAntigravity, getCurrentAccount } =
-      await import("~/services/antigravity/auth")
-    const existingAuth = await loadAntigravityAuth()
+    // Import auth module
+    const {
+      loadAntigravityAuth,
+      setupAntigravity,
+      getCurrentAccount,
+      hasApiKey,
+      getApiKey,
+      setOAuthCredentials,
+    } = await import("~/services/antigravity/auth")
 
-    if (!existingAuth || existingAuth.accounts.length === 0) {
-      consola.warn("No Antigravity accounts found")
-      await setupAntigravity()
-    } else {
-      const enabledCount = existingAuth.accounts.filter((a) => a.enable).length
-      consola.info(
-        `Found ${existingAuth.accounts.length} Antigravity accounts (${enabledCount} enabled)`,
-      )
+    // Set CLI-provided OAuth credentials if available
+    if (options.antigravityClientId && options.antigravityClientSecret) {
+      setOAuthCredentials(options.antigravityClientId, options.antigravityClientSecret)
+      consola.info("Using provided OAuth credentials from CLI")
     }
 
-    const currentAccount = await getCurrentAccount()
-    if (!currentAccount) {
-      throw new Error("No enabled Antigravity accounts available")
+    // Check for API Key first (simplest authentication)
+    if (hasApiKey()) {
+      consola.info("Using Gemini API Key for authentication (from GEMINI_API_KEY)")
+      consola.info("API Key: " + getApiKey()?.slice(0, 10) + "...")
+    } else {
+      // Fall back to OAuth authentication
+      const existingAuth = await loadAntigravityAuth()
+
+      if (!existingAuth || existingAuth.accounts.length === 0) {
+        consola.warn("No Antigravity accounts found and no GEMINI_API_KEY set")
+        consola.info("")
+        consola.info("You can authenticate using one of these methods:")
+        consola.info("")
+        consola.info("Method 1: API Key (Recommended - Simplest)")
+        consola.info("  Set environment variable: GEMINI_API_KEY=your_api_key")
+        consola.info("  Get your API key from: https://aistudio.google.com/apikey")
+        consola.info("")
+        consola.info("Method 2: OAuth (Current setup)")
+        consola.info("  Will proceed with OAuth login flow...")
+        consola.info("")
+        await setupAntigravity()
+      } else {
+        const enabledCount = existingAuth.accounts.filter((a) => a.enable).length
+        consola.info(
+          `Found ${existingAuth.accounts.length} Antigravity accounts (${enabledCount} enabled)`,
+        )
+      }
+
+      const currentAccount = await getCurrentAccount()
+      if (!currentAccount && !hasApiKey()) {
+        throw new Error("No enabled Antigravity accounts available")
+      }
     }
 
     // Get Antigravity models
@@ -351,6 +389,15 @@ export const start = defineCommand({
       description:
         "Enable Google Antigravity mode (proxy to Antigravity instead of GitHub Copilot)",
     },
+    "antigravity-client-id": {
+      type: "string",
+      description:
+        "Google OAuth Client ID for Antigravity (create at https://console.cloud.google.com/apis/credentials)",
+    },
+    "antigravity-client-secret": {
+      type: "string",
+      description: "Google OAuth Client Secret for Antigravity",
+    },
   },
   run({ args }) {
     const rateLimitRaw = args["rate-limit"]
@@ -380,6 +427,8 @@ export const start = defineCommand({
       zen: args.zen,
       zenApiKey: args["zen-api-key"],
       antigravity: args.antigravity,
+      antigravityClientId: args["antigravity-client-id"],
+      antigravityClientSecret: args["antigravity-client-secret"],
     })
   },
 })

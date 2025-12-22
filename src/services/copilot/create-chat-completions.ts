@@ -28,6 +28,11 @@ export const createChatCompletions = async (
     "X-Initiator": isAgentCall ? "agent" : "user",
   }
 
+  consola.info("Sending request to Copilot:", {
+    model: payload.model,
+    endpoint: `${copilotBaseUrl(state)}/chat/completions`,
+  })
+
   const response = await fetch(`${copilotBaseUrl(state)}/chat/completions`, {
     method: "POST",
     headers,
@@ -35,8 +40,13 @@ export const createChatCompletions = async (
   })
 
   if (!response.ok) {
-    consola.error("Failed to create chat completions", response)
-    throw new HTTPError("Failed to create chat completions", response)
+    const errorBody = await response.text()
+    consola.error("Failed to create chat completions", {
+      status: response.status,
+      statusText: response.statusText,
+      body: errorBody,
+    })
+    throw new HTTPError(`Failed to create chat completions: ${response.status} ${errorBody}`, response)
   }
 
   if (payload.stream) {

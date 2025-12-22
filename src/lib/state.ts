@@ -5,6 +5,7 @@ import type { ZenModelsResponse } from "~/services/zen/get-models"
 export interface State {
   githubToken?: string
   copilotToken?: string
+  copilotApiEndpoint?: string // API endpoint returned by token response
 
   accountType: string
   models?: ModelsResponse

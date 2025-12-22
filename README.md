@@ -169,20 +169,55 @@ npx copilot-api-plus@latest logout --zen
 #### 前置要求
 - Google 账户
 
-#### 启动步骤
+#### 认证方式
+
+**方式一：API Key（推荐 - 最简单）**
+
+1. 访问 https://aistudio.google.com/apikey 获取 API Key
+2. 使用环境变量启动：
+
+```bash
+# Linux/macOS
+GEMINI_API_KEY=your_api_key npx copilot-api-plus@latest start --antigravity
+
+# Windows PowerShell
+$env:GEMINI_API_KEY = "your_api_key"
+npx copilot-api-plus@latest start --antigravity
+
+# Windows CMD
+set GEMINI_API_KEY=your_api_key
+npx copilot-api-plus@latest start --antigravity
+```
+
+**方式二：OAuth 网页登录（推荐）**
 
 ```bash
 npx copilot-api-plus@latest start --antigravity
 ```
 
-**首次运行**会引导你完成 Google OAuth 认证：
+首次运行会提示选择登录方式：
+- **Web（推荐）**：自动打开浏览器完成 Google 登录，授权后自动捕获回调
+- **Manual**：手动复制回调 URL 到终端
 
-1. 终端显示 Google 授权 URL
-2. 在浏览器中打开该 URL
-3. 使用 Google 账号登录并授权
-4. 授权成功后，浏览器会跳转到一个 `localhost:8046/callback?code=...` 的页面
-5. **复制浏览器地址栏中的完整 URL**
-6. 粘贴到终端，按回车完成认证
+**方式三：自定义 OAuth 凭证**
+
+如果遇到 `invalid_client` 错误，可以创建自己的 OAuth 应用：
+
+1. 访问 https://console.cloud.google.com/apis/credentials
+2. 创建 OAuth 2.0 客户端 ID（选择"桌面应用"类型）
+3. 添加重定向 URI：`http://localhost:8046/callback`
+4. 使用环境变量或命令行参数：
+
+```bash
+# 环境变量方式
+ANTIGRAVITY_CLIENT_ID=your_client_id ANTIGRAVITY_CLIENT_SECRET=your_secret \
+  npx copilot-api-plus@latest start --antigravity
+
+# 命令行参数方式
+npx copilot-api-plus@latest start --antigravity \
+  --antigravity-client-id your_client_id \
+  --antigravity-client-secret your_secret
+```
 
 #### 可用模型
 
@@ -485,6 +520,8 @@ curl http://localhost:4141/v1/messages \
 | `--zen` | `-z` | false | 启用 OpenCode Zen 模式 |
 | `--zen-api-key` | - | - | Zen API Key |
 | `--antigravity` | - | false | 启用 Google Antigravity 模式 |
+| `--antigravity-client-id` | - | - | Antigravity OAuth Client ID |
+| `--antigravity-client-secret` | - | - | Antigravity OAuth Client Secret |
 | `--rate-limit` | `-r` | - | 请求间隔（秒） |
 | `--wait` | `-w` | false | 达到限制时等待而非报错 |
 | `--manual` | - | false | 手动审批每个请求 |
