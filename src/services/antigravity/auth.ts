@@ -416,8 +416,10 @@ export async function exchangeCodeForTokens(
 /**
  * Start a local OAuth callback server and wait for authorization
  * This provides a seamless web-based login experience
+ *
+ * @param onServerReady - Callback function called when server is ready to accept connections
  */
-async function startOAuthCallbackServer(): Promise<string> {
+async function startOAuthCallbackServer(onServerReady?: () => void): Promise<string> {
   return new Promise((resolve, reject) => {
     const server = Bun.serve({
       port: 8046,
@@ -457,6 +459,11 @@ async function startOAuthCallbackServer(): Promise<string> {
 
     consola.info(`OAuth callback server started on http://localhost:8046`)
 
+    // Call the callback to signal server is ready
+    if (onServerReady) {
+      onServerReady()
+    }
+
     // Timeout after 5 minutes
     setTimeout(() => {
       server.stop()
@@ -494,30 +501,41 @@ export async function setupAntigravityWeb(): Promise<void> {
   consola.info("")
 
   const oauthUrl = getOAuthUrl()
-  consola.info("Opening browser for Google login...")
-  consola.info(`If browser doesn't open, visit: ${oauthUrl}`)
-  consola.info("")
 
-  // Try to open browser automatically
-  try {
-    const { exec } = await import("node:child_process")
-    const platform = process.platform
+  // Function to open browser - will be called after server is ready
+  const openBrowser = async () => {
+    consola.info("Opening browser for Google login...")
+    consola.info(`If browser doesn't open, visit: ${oauthUrl}`)
+    consola.info("")
 
-    if (platform === "win32") {
-      exec(`start "" "${oauthUrl}"`)
-    } else if (platform === "darwin") {
-      exec(`open "${oauthUrl}"`)
-    } else {
-      exec(`xdg-open "${oauthUrl}"`)
+    try {
+      const { exec } = await import("node:child_process")
+      const platform = process.platform
+
+      if (platform === "win32") {
+        exec(`start "" "${oauthUrl}"`)
+      } else if (platform === "darwin") {
+        exec(`open "${oauthUrl}"`)
+      } else {
+        exec(`xdg-open "${oauthUrl}"`)
+      }
+    } catch {
+      consola.warn("Could not open browser automatically")
     }
-  } catch {
-    consola.warn("Could not open browser automatically")
+
+    consola.info("Waiting for authorization...")
   }
 
-  consola.info("Waiting for authorization...")
-
   try {
-    const code = await startOAuthCallbackServer()
+    // Start server first, then open browser when server is ready
+    const code = await startOAuthCallbackServer(() => {
+      // Use setImmediate to ensure this runs after the server is fully ready
+      setImmediate(() => {
+        openBrowser().catch(() => {
+          // Ignore browser open errors
+        })
+      })
+    })
 
     consola.info("Authorization code received, exchanging for tokens...")
 

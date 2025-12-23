@@ -6,7 +6,9 @@
       "Bash(timeout 30 bun run dev:*)",
       "Bash(bun -e:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(npm publish:*)"
     ]
   }
 }
