@@ -416,57 +416,62 @@ export async function exchangeCodeForTokens(
 /**
  * Start a local OAuth callback server and wait for authorization
  * This provides a seamless web-based login experience
+ * Uses Node.js http module for compatibility with both Node.js and Bun
  *
  * @param onServerReady - Callback function called when server is ready to accept connections
  */
 async function startOAuthCallbackServer(onServerReady?: () => void): Promise<string> {
+  const http = await import("node:http")
+
   return new Promise((resolve, reject) => {
-    const server = Bun.serve({
-      port: 8046,
-      async fetch(req) {
-        const url = new URL(req.url)
+    const server = http.createServer((req, res) => {
+      const url = new URL(req.url || "/", `http://localhost:8046`)
 
-        if (url.pathname === "/callback") {
-          const code = url.searchParams.get("code")
-          const error = url.searchParams.get("error")
+      if (url.pathname === "/callback") {
+        const code = url.searchParams.get("code")
+        const error = url.searchParams.get("error")
 
-          if (error) {
-            // Close server after a short delay
-            setTimeout(() => server.stop(), 100)
-            reject(new Error(`OAuth error: ${error}`))
-            return new Response(
-              `<html><body><h1>Authorization Failed</h1><p>Error: ${error}</p><p>You can close this window.</p></body></html>`,
-              { headers: { "Content-Type": "text/html" } }
-            )
-          }
-
-          if (code) {
-            // Close server after a short delay
-            setTimeout(() => server.stop(), 100)
-            resolve(code)
-            return new Response(
-              `<html><body><h1>Authorization Successful!</h1><p>You can close this window and return to the terminal.</p></body></html>`,
-              { headers: { "Content-Type": "text/html" } }
-            )
-          }
-
-          return new Response("Missing authorization code", { status: 400 })
+        if (error) {
+          res.writeHead(200, { "Content-Type": "text/html" })
+          res.end(
+            `<html><body><h1>Authorization Failed</h1><p>Error: ${error}</p><p>You can close this window.</p></body></html>`
+          )
+          setTimeout(() => server.close(), 100)
+          reject(new Error(`OAuth error: ${error}`))
+          return
         }
 
-        return new Response("Not found", { status: 404 })
-      },
+        if (code) {
+          res.writeHead(200, { "Content-Type": "text/html" })
+          res.end(
+            `<html><body><h1>Authorization Successful!</h1><p>You can close this window and return to the terminal.</p></body></html>`
+          )
+          setTimeout(() => server.close(), 100)
+          resolve(code)
+          return
+        }
+
+        res.writeHead(400, { "Content-Type": "text/plain" })
+        res.end("Missing authorization code")
+        return
+      }
+
+      res.writeHead(404, { "Content-Type": "text/plain" })
+      res.end("Not found")
     })
 
-    consola.info(`OAuth callback server started on http://localhost:8046`)
+    server.listen(8046, () => {
+      consola.info(`OAuth callback server started on http://localhost:8046`)
 
-    // Call the callback to signal server is ready
-    if (onServerReady) {
-      onServerReady()
-    }
+      // Call the callback to signal server is ready
+      if (onServerReady) {
+        onServerReady()
+      }
+    })
 
     // Timeout after 5 minutes
     setTimeout(() => {
-      server.stop()
+      server.close()
       reject(new Error("OAuth timeout - no callback received within 5 minutes"))
     }, 5 * 60 * 1000)
   })
