@@ -28,7 +28,8 @@ export function getZenAuthPath(): string {
 export async function saveZenAuth(auth: ZenAuth): Promise<void> {
   await ensurePaths()
   const authPath = getZenAuthPath()
-  await Bun.write(authPath, JSON.stringify(auth, null, 2))
+  const fs = await import("node:fs/promises")
+  await fs.writeFile(authPath, JSON.stringify(auth, null, 2), "utf-8")
   consola.success("Zen API key saved to", authPath)
 }
 
@@ -38,13 +39,16 @@ export async function saveZenAuth(auth: ZenAuth): Promise<void> {
 export async function loadZenAuth(): Promise<ZenAuth | null> {
   try {
     const authPath = getZenAuthPath()
-    const file = Bun.file(authPath)
+    const fs = await import("node:fs/promises")
 
-    if (!(await file.exists())) {
+    // Check if file exists
+    try {
+      await fs.access(authPath)
+    } catch {
       return null
     }
 
-    const content = await file.text()
+    const content = await fs.readFile(authPath, "utf-8")
     return JSON.parse(content) as ZenAuth
   } catch {
     return null

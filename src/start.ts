@@ -245,19 +245,23 @@ export async function runServer(options: RunServerOptions): Promise<void> {
   const serverUrl = `http://localhost:${options.port}`
 
   if (options.claudeCode) {
-    let models = state.models
+    // Get model list based on current mode
+    // All model responses share the same { data: Array<{ id: string }> } structure
+    let modelList: Array<{ id: string }> | undefined
     if (state.zenMode) {
-      models = state.zenModels
+      modelList = state.zenModels?.data
     } else if (state.antigravityMode) {
-      models = state.antigravityModels
+      modelList = state.antigravityModels?.data
+    } else {
+      modelList = state.models?.data
     }
-    invariant(models, "Models should be loaded by now")
+    invariant(modelList, "Models should be loaded by now")
 
     const selectedModel = await consola.prompt(
       "Select a model to use with Claude Code",
       {
         type: "select",
-        options: models.data.map((model) => model.id),
+        options: modelList.map((model) => model.id),
       },
     )
 
@@ -265,7 +269,7 @@ export async function runServer(options: RunServerOptions): Promise<void> {
       "Select a small model to use with Claude Code",
       {
         type: "select",
-        options: models.data.map((model) => model.id),
+        options: modelList.map((model) => model.id),
       },
     )
 

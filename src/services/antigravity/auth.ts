@@ -109,7 +109,8 @@ export async function saveAntigravityAuth(
 ): Promise<void> {
   await ensurePaths()
   const authPath = getAntigravityAuthPath()
-  await Bun.write(authPath, JSON.stringify(auth, null, 2))
+  const fs = await import("node:fs/promises")
+  await fs.writeFile(authPath, JSON.stringify(auth, null, 2), "utf-8")
   consola.success("Antigravity accounts saved to", authPath)
 }
 
@@ -119,13 +120,16 @@ export async function saveAntigravityAuth(
 export async function loadAntigravityAuth(): Promise<AntigravityAuth | null> {
   try {
     const authPath = getAntigravityAuthPath()
-    const file = Bun.file(authPath)
+    const fs = await import("node:fs/promises")
 
-    if (!(await file.exists())) {
+    // Check if file exists
+    try {
+      await fs.access(authPath)
+    } catch {
       return null
     }
 
-    const content = await file.text()
+    const content = await fs.readFile(authPath, "utf-8")
     const data = JSON.parse(content)
 
     // Handle both array format (legacy) and object format
