@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Copilot API Usage Dashboard</title>
+    <title>API Usage Dashboard - Copilot / Antigravity / Zen</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -123,10 +123,10 @@
               />
               <path d="M12 6.8a10 10 0 0 0 -3.2 7.2" />
             </svg>
-            <span>Copilot API Usage Dashboard</span>
+            <span>API Usage Dashboard</span>
           </h1>
           <p class="mt-1 text-sm" style="color: var(--color-gray)">
-            Should be the same as the one in VSCode
+            Supports Copilot, Antigravity, and Zen modes
           </p>
         </header>
 
@@ -231,6 +231,17 @@
         }
 
         /**
+         * Detects the mode based on the API response data.
+         * @param {object} data - The API response data.
+         * @returns {string} 'copilot', 'antigravity', or 'zen'
+         */
+        function detectMode(data) {
+          if (data.mode === 'zen') return 'zen';
+          if (data.copilot_plan === 'antigravity') return 'antigravity';
+          return 'copilot';
+        }
+
+        /**
          * Renders the entire UI based on the current state.
          */
         function render() {
@@ -241,10 +252,24 @@
           if (state.error) {
             contentArea.innerHTML = renderError(state.error);
           } else if (state.data) {
-            contentArea.innerHTML = `
+            const mode = detectMode(state.data);
+
+            if (mode === 'zen') {
+              // Zen mode - show info message
+              contentArea.innerHTML = renderZenInfo(state.data);
+            } else if (mode === 'antigravity') {
+              // Antigravity mode - show model quotas
+              contentArea.innerHTML = `
+                        ${renderAntigravityQuotas(state.data)}
+                        ${renderDetailedData(state.data)}
+                    `;
+            } else {
+              // Copilot mode - original behavior
+              contentArea.innerHTML = `
                         ${renderUsageQuotas(state.data.quota_snapshots)}
                         ${renderDetailedData(state.data)}
                     `;
+            }
           } else {
             contentArea.innerHTML = renderWelcomeMessage();
           }
@@ -253,7 +278,131 @@
         }
 
         /**
-         * Renders the "Usage Quotas" section with progress bars.
+         * Renders Zen mode info message.
+         * @param {object} data - The API response data.
+         * @returns {string} HTML string for the Zen info message.
+         */
+        function renderZenInfo(data) {
+          return `
+            <div class="text-center py-16 px-4 border" style="background-color: var(--color-bg-soft); border-color: var(--color-bg-light-2);">
+                <i data-lucide="info" class="mx-auto h-10 w-10" style="color: var(--color-purple-accent);"></i>
+                <h3 class="mt-2 text-lg font-semibold" style="color: var(--color-fg-lightest);">OpenCode Zen Mode</h3>
+                <p class="mt-1 text-sm" style="color: var(--color-gray);">${data.message || 'Usage statistics not available for Zen mode.'}</p>
+                <a href="https://console.opencode.ai" target="_blank" rel="noopener noreferrer"
+                   class="inline-block mt-4 px-4 py-2 font-semibold transition-colors"
+                   style="background-color: var(--color-purple); color: var(--color-bg-darkest);">
+                   View Usage Dashboard
+                </a>
+            </div>
+          `;
+        }
+
+        /**
+         * Renders Antigravity model quotas.
+         * @param {object} data - The API response data.
+         * @returns {string} HTML string for Antigravity quotas.
+         */
+        function renderAntigravityQuotas(data) {
+          const models = data.quota_snapshots?.models || {};
+          const resetDate = data.quota_reset_date;
+
+          if (Object.keys(models).length === 0) {
+            return `
+              <section id="usage-quotas" class="mb-6">
+                <h2 class="text-xl font-bold mb-3 flex items-center gap-2" style="color: var(--color-fg-lightest);">
+                    <i data-lucide="bar-chart-big"></i> Antigravity Model Quotas
+                </h2>
+                <div class="p-4 border text-center" style="background-color: var(--color-bg-soft); border-color: var(--color-bg-light-2);">
+                    <p style="color: var(--color-gray);">No quota information available. Models may be using fallback data.</p>
+                </div>
+              </section>
+            `;
+          }
+
+          // Group models by provider
+          const geminiModels = {};
+          const claudeModels = {};
+          const otherModels = {};
+
+          Object.entries(models).forEach(([modelId, quota]) => {
+            if (modelId.startsWith('gemini') || modelId.startsWith('learnlm')) {
+              geminiModels[modelId] = quota;
+            } else if (modelId.startsWith('claude')) {
+              claudeModels[modelId] = quota;
+            } else {
+              otherModels[modelId] = quota;
+            }
+          });
+
+          const renderModelGroup = (title, icon, models, color) => {
+            if (Object.keys(models).length === 0) return '';
+
+            const cards = Object.entries(models)
+              .map(([modelId, quota]) => renderAntigravityCard(modelId, quota))
+              .join('');
+
+            return `
+              <div class="mb-4">
+                <h3 class="text-md font-semibold mb-2 flex items-center gap-2" style="color: ${color};">
+                  <i data-lucide="${icon}" class="h-4 w-4"></i> ${title}
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  ${cards}
+                </div>
+              </div>
+            `;
+          };
+
+          return `
+            <section id="usage-quotas" class="mb-6">
+                <h2 class="text-xl font-bold mb-3 flex items-center gap-2" style="color: var(--color-fg-lightest);">
+                    <i data-lucide="bar-chart-big"></i> Antigravity Model Quotas
+                </h2>
+                ${resetDate ? `<p class="text-sm mb-4" style="color: var(--color-gray);">Next reset: ${new Date(resetDate).toLocaleString()}</p>` : ''}
+                ${renderModelGroup('Gemini Models', 'sparkles', geminiModels, 'var(--color-blue-accent)')}
+                ${renderModelGroup('Claude Models', 'message-square', claudeModels, 'var(--color-orange-accent)')}
+                ${renderModelGroup('Other Models', 'box', otherModels, 'var(--color-gray-accent)')}
+            </section>
+          `;
+        }
+
+        /**
+         * Renders a single Antigravity model quota card.
+         * @param {string} modelId - The model ID.
+         * @param {object} quota - The quota details.
+         * @returns {string} HTML string for the card.
+         */
+        function renderAntigravityCard(modelId, quota) {
+          const percentRemaining = quota.percent_remaining || 0;
+          const percentUsed = 100 - percentRemaining;
+          const remainingFraction = quota.remaining_fraction || 0;
+          const resetTime = quota.reset_time;
+
+          let progressBarColor = "var(--color-green)";
+          if (percentUsed > 75) progressBarColor = "var(--color-yellow)";
+          if (percentUsed > 90) progressBarColor = "var(--color-red)";
+
+          return `
+            <div class="p-3 border" style="background-color: var(--color-bg); border-color: var(--color-bg-light-2);">
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-sm font-medium truncate" style="color: var(--color-fg-lightest);" title="${modelId}">${modelId}</h4>
+                    <span class="text-xs font-mono ml-2 whitespace-nowrap" style="color: var(--color-fg-medium);">${percentUsed.toFixed(0)}% Used</span>
+                </div>
+                <div class="mb-2">
+                     <div class="w-full progress-bar-bg h-1.5">
+                         <div class="progress-bar-fg h-1.5" style="width: ${percentUsed}%; background-color: ${progressBarColor};"></div>
+                     </div>
+                </div>
+                <div class="flex justify-between text-xs" style="color: var(--color-fg-dark);">
+                    <span>${percentRemaining}% remaining</span>
+                    ${resetTime ? `<span title="Reset: ${new Date(resetTime).toLocaleString()}">⏱️</span>` : ''}
+                </div>
+            </div>
+          `;
+        }
+
+        /**
+         * Renders the "Usage Quotas" section with progress bars (Copilot mode).
          * @param {object} snapshots - The quota_snapshots object from the API response.
          * @returns {string} HTML string for the usage quotas section.
          */
