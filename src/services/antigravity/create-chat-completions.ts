@@ -50,8 +50,8 @@ const getGeminiNoStreamUrl = (model: string, apiKey: string) =>
 export interface ChatMessage {
   role: "system" | "user" | "assistant"
   content:
-  | string
-  | Array<{ type: string; text?: string; image_url?: { url: string } }>
+    | string
+    | Array<{ type: string; text?: string; image_url?: { url: string } }>
 }
 
 export interface ChatCompletionRequest {
@@ -138,29 +138,83 @@ function parseBase64Image(
 }
 
 /**
+ * Clean and convert JSON schema to Gemini format
+ * - Removes unsupported fields like $schema, additionalProperties
+ * - Converts type values to uppercase (string -> STRING)
+ */
+function cleanJsonSchema(schema: unknown): unknown {
+  if (!schema || typeof schema !== "object") return schema
+
+  // Handle arrays
+  if (Array.isArray(schema)) {
+    return schema.map((item) => cleanJsonSchema(item))
+  }
+
+  const obj = schema as Record<string, unknown>
+  const cleaned: Record<string, unknown> = {}
+
+  // List of unsupported JSON Schema fields for Gemini API
+  const unsupportedFields = new Set([
+    "$schema",
+    "$id",
+    "$ref",
+    "additionalProperties",
+    "default",
+    "examples",
+    "minItems",
+    "maxItems",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "pattern",
+    "format",
+  ])
+
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip unsupported fields
+    if (unsupportedFields.has(key)) continue
+
+    // Convert type values to uppercase for Gemini API
+    if (key === "type" && typeof value === "string") {
+      cleaned[key] = value.toUpperCase()
+    } else if (typeof value === "object" && value !== null) {
+      cleaned[key] = cleanJsonSchema(value)
+    } else {
+      cleaned[key] = value
+    }
+  }
+
+  return cleaned
+}
+
+/**
  * Convert tools to Antigravity format
+ * All tools should be in a single object with functionDeclarations array
  */
 function convertTools(tools?: Array<unknown>): Array<unknown> | undefined {
   if (!tools || tools.length === 0) return undefined
 
-  return tools.map((tool) => {
+  const functionDeclarations: Array<unknown> = []
+
+  for (const tool of tools) {
     const t = tool as {
       type: string
       function?: { name: string; description?: string; parameters?: unknown }
     }
     if (t.type === "function" && t.function) {
-      return {
-        functionDeclarations: [
-          {
-            name: t.function.name,
-            description: t.function.description || "",
-            parameters: t.function.parameters || {},
-          },
-        ],
-      }
+      functionDeclarations.push({
+        name: t.function.name,
+        description: t.function.description || "",
+        parameters: cleanJsonSchema(t.function.parameters) || {},
+      })
     }
-    return tool
-  })
+  }
+
+  if (functionDeclarations.length === 0) return undefined
+
+  // Return as a single object with all function declarations
+  return [{ functionDeclarations }]
 }
 
 /**
@@ -263,8 +317,9 @@ async function createWithApiKey(
   request: ChatCompletionRequest,
   apiKey: string,
 ): Promise<Response> {
-  const endpoint = request.stream
-    ? getGeminiStreamUrl(request.model, apiKey)
+  const endpoint =
+    request.stream ?
+      getGeminiStreamUrl(request.model, apiKey)
     : getGeminiNoStreamUrl(request.model, apiKey)
   const body = buildStandardGeminiRequestBody(request)
 
@@ -283,8 +338,8 @@ async function createWithApiKey(
       return await handleApiError(response)
     }
 
-    return request.stream
-      ? transformStreamResponse(response, request.model)
+    return request.stream ?
+        transformStreamResponse(response, request.model)
       : await transformNonStreamResponse(response, request.model)
   } catch (error) {
     consola.error("Gemini API request error:", error)
@@ -304,10 +359,13 @@ async function createWithOAuth(
   request: ChatCompletionRequest,
   accessToken: string,
 ): Promise<Response> {
-  const endpoint = request.stream ? ANTIGRAVITY_STREAM_URL : ANTIGRAVITY_NO_STREAM_URL
+  const endpoint =
+    request.stream ? ANTIGRAVITY_STREAM_URL : ANTIGRAVITY_NO_STREAM_URL
   const body = buildAntigravityRequestBody(request)
 
-  consola.debug(`Antigravity request to ${endpoint} with model ${request.model}`)
+  consola.debug(
+    `Antigravity request to ${endpoint} with model ${request.model}`,
+  )
 
   try {
     const response = await fetch(endpoint, {
@@ -326,8 +384,8 @@ async function createWithOAuth(
       return await handleApiError(response)
     }
 
-    return request.stream
-      ? transformStreamResponse(response, request.model)
+    return request.stream ?
+        transformStreamResponse(response, request.model)
       : await transformNonStreamResponse(response, request.model)
   } catch (error) {
     consola.error("Antigravity request error:", error)

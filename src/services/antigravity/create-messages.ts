@@ -135,27 +135,80 @@ function buildParts(content: AnthropicMessage["content"]): Array<unknown> {
 }
 
 /**
+ * Clean and convert JSON schema to Gemini format
+ * - Removes unsupported fields like $schema, additionalProperties
+ * - Converts type values to uppercase (string -> STRING)
+ */
+function cleanJsonSchema(schema: unknown): unknown {
+  if (!schema || typeof schema !== "object") return schema
+
+  // Handle arrays
+  if (Array.isArray(schema)) {
+    return schema.map((item) => cleanJsonSchema(item))
+  }
+
+  const obj = schema as Record<string, unknown>
+  const cleaned: Record<string, unknown> = {}
+
+  // List of unsupported JSON Schema fields for Gemini API
+  const unsupportedFields = new Set([
+    "$schema",
+    "$id",
+    "$ref",
+    "additionalProperties",
+    "default",
+    "examples",
+    "minItems",
+    "maxItems",
+    "minLength",
+    "maxLength",
+    "minimum",
+    "maximum",
+    "pattern",
+    "format",
+  ])
+
+  for (const [key, value] of Object.entries(obj)) {
+    // Skip unsupported fields
+    if (unsupportedFields.has(key)) continue
+
+    // Convert type values to uppercase for Gemini API
+    if (key === "type" && typeof value === "string") {
+      cleaned[key] = value.toUpperCase()
+    } else if (typeof value === "object" && value !== null) {
+      cleaned[key] = cleanJsonSchema(value)
+    } else {
+      cleaned[key] = value
+    }
+  }
+
+  return cleaned
+}
+
+/**
  * Convert tools to Antigravity format
+ * All tools should be in a single object with functionDeclarations array
  */
 function convertTools(tools?: Array<unknown>): Array<unknown> | undefined {
   if (!tools || tools.length === 0) return undefined
 
-  return tools.map((tool) => {
+  const functionDeclarations: Array<unknown> = []
+
+  for (const tool of tools) {
     const t = tool as {
       name: string
       description?: string
       input_schema?: unknown
     }
-    return {
-      functionDeclarations: [
-        {
-          name: t.name,
-          description: t.description || "",
-          parameters: t.input_schema || {},
-        },
-      ],
-    }
-  })
+    functionDeclarations.push({
+      name: t.name,
+      description: t.description || "",
+      parameters: cleanJsonSchema(t.input_schema) || {},
+    })
+  }
+
+  // Return as a single object with all function declarations
+  return [{ functionDeclarations }]
 }
 
 /**
@@ -232,10 +285,13 @@ export async function createAntigravityMessages(
     )
   }
 
-  const endpoint = request.stream ? ANTIGRAVITY_STREAM_URL : ANTIGRAVITY_NO_STREAM_URL
+  const endpoint =
+    request.stream ? ANTIGRAVITY_STREAM_URL : ANTIGRAVITY_NO_STREAM_URL
   const body = buildGeminiRequest(request)
 
-  consola.debug(`Antigravity messages request to ${endpoint} with model ${request.model}`)
+  consola.debug(
+    `Antigravity messages request to ${endpoint} with model ${request.model}`,
+  )
 
   try {
     const response = await fetch(endpoint, {
@@ -444,7 +500,7 @@ async function transformNonStreamResponse(
   response: Response,
   model: string,
 ): Promise<Response> {
-  interface NonStreamData {
+  interface AntigravityResponseData {
     candidates?: Array<{
       content?: {
         parts?: Array<{
@@ -458,7 +514,16 @@ async function transformNonStreamResponse(
     usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number }
   }
 
-  const data = (await response.json()) as NonStreamData
+  interface NonStreamData {
+    response?: AntigravityResponseData
+    candidates?: AntigravityResponseData["candidates"]
+    usageMetadata?: AntigravityResponseData["usageMetadata"]
+  }
+
+  const rawData = (await response.json()) as NonStreamData
+
+  // Handle nested response structure (Antigravity wraps response in a "response" object)
+  const data = rawData.response ?? rawData
   const candidate = data.candidates?.[0]
   const parts = candidate?.content?.parts ?? []
   const content = buildNonStreamContent(parts)
