@@ -28,7 +28,7 @@ export const createChatCompletions = async (
     "X-Initiator": isAgentCall ? "agent" : "user",
   }
 
-  consola.info("Sending request to Copilot:", {
+  consola.debug("Sending request to Copilot:", {
     model: payload.model,
     endpoint: `${copilotBaseUrl(state)}/chat/completions`,
   })
@@ -46,7 +46,10 @@ export const createChatCompletions = async (
       statusText: response.statusText,
       body: errorBody,
     })
-    throw new HTTPError(`Failed to create chat completions: ${response.status} ${errorBody}`, response)
+    throw new HTTPError(
+      `Failed to create chat completions: ${response.status} ${errorBody}`,
+      response,
+    )
   }
 
   if (payload.stream) {
