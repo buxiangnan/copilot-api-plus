@@ -96,14 +96,14 @@ function convertMessages(messages: Array<ChatMessage>): ConvertedContent {
  */
 function buildSystemInstruction(content: ChatMessage["content"]): {
   role: string
-  parts: { text: string }
+  parts: Array<{ text: string }>
 } {
   const text =
     typeof content === "string" ? content : (
       content.map((c) => c.text || "").join("")
     )
-  // Note: system_instruction.parts should be a single object, not an array
-  return { role: "user", parts: { text } }
+  // Antigravity API expects: { role: "user", parts: [{ text: "..." }] }
+  return { role: "user", parts: [{ text }] }
 }
 
 /**
