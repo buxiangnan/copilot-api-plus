@@ -95,15 +95,14 @@ function convertMessages(messages: Array<ChatMessage>): ConvertedContent {
  * Build system instruction from content
  */
 function buildSystemInstruction(content: ChatMessage["content"]): {
-  role: string
   parts: Array<{ text: string }>
 } {
   const text =
     typeof content === "string" ? content : (
       content.map((c) => c.text || "").join("")
     )
-  // Antigravity API expects: { role: "user", parts: [{ text: "..." }] }
-  return { role: "user", parts: [{ text }] }
+  // Antigravity API: { parts: [{ text: "..." }] } without role field
+  return { parts: [{ text }] }
 }
 
 /**

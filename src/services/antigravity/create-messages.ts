@@ -82,7 +82,7 @@ interface AntigravityContent {
 
 interface ConvertedMessages {
   contents: Array<AntigravityContent>
-  systemInstruction?: { role: string; parts: Array<{ text: string }> }
+  systemInstruction?: { parts: Array<{ text: string }> }
 }
 
 /**
@@ -93,13 +93,11 @@ function convertMessages(
   system?: string,
 ): ConvertedMessages {
   const contents: Array<AntigravityContent> = []
-  let systemInstruction:
-    | { role: string; parts: Array<{ text: string }> }
-    | undefined
+  let systemInstruction: { parts: Array<{ text: string }> } | undefined
 
   if (system) {
-    // Antigravity API expects: { role: "user", parts: [{ text: "..." }] }
-    systemInstruction = { role: "user", parts: [{ text: system }] }
+    // Antigravity API: { parts: [{ text: "..." }] } without role field
+    systemInstruction = { parts: [{ text: system }] }
   }
 
   for (const message of messages) {
