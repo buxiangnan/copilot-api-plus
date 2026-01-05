@@ -77,7 +77,7 @@ export interface AnthropicMessageRequest {
 
 interface AntigravityContent {
   role: string
-  parts: Array<unknown>
+  parts: Array<unknown> | { text: string }
 }
 
 interface ConvertedMessages {
@@ -96,7 +96,8 @@ function convertMessages(
   let systemInstruction: AntigravityContent | undefined
 
   if (system) {
-    systemInstruction = { role: "user", parts: [{ text: system }] }
+    // Note: system_instruction.parts should be a single object, not an array
+    systemInstruction = { role: "user", parts: { text: system } }
   }
 
   for (const message of messages) {

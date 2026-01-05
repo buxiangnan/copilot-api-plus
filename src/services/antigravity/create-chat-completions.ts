@@ -96,13 +96,14 @@ function convertMessages(messages: Array<ChatMessage>): ConvertedContent {
  */
 function buildSystemInstruction(content: ChatMessage["content"]): {
   role: string
-  parts: Array<unknown>
+  parts: { text: string }
 } {
   const text =
     typeof content === "string" ? content : (
       content.map((c) => c.text || "").join("")
     )
-  return { role: "user", parts: [{ text }] }
+  // Note: system_instruction.parts should be a single object, not an array
+  return { role: "user", parts: { text } }
 }
 
 /**

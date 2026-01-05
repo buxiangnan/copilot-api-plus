@@ -2,9 +2,9 @@ import type { Context } from "hono"
 
 import { Hono } from "hono"
 import { cors } from "hono/cors"
-import { logger } from "hono/logger"
 
 import { apiKeyAuthMiddleware } from "./lib/api-key-auth"
+import { modelLogger } from "./lib/model-logger"
 import { state } from "./lib/state"
 import { antigravityChatCompletionsRoute } from "./routes/antigravity/chat-completions/route"
 import { antigravityMessagesRoute } from "./routes/antigravity/messages/route"
@@ -21,7 +21,7 @@ import { zenModelRoutes } from "./routes/zen/models/route"
 
 export const server = new Hono()
 
-server.use(logger())
+server.use(modelLogger())
 server.use(cors())
 server.use(apiKeyAuthMiddleware)
 
@@ -41,13 +41,15 @@ function createSubRequest(c: Context, basePath: string): Request {
 server.all("/chat/completions/*", async (c) => {
   const req = createSubRequest(c, "/chat/completions")
   if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
-  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  if (state.antigravityMode)
+    return antigravityChatCompletionsRoute.fetch(req, c.env)
   return completionRoutes.fetch(req, c.env)
 })
 server.all("/chat/completions", async (c) => {
   const req = createSubRequest(c, "/chat/completions")
   if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
-  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  if (state.antigravityMode)
+    return antigravityChatCompletionsRoute.fetch(req, c.env)
   return completionRoutes.fetch(req, c.env)
 })
 
@@ -73,13 +75,15 @@ server.route("/token", tokenRoute)
 server.all("/v1/chat/completions/*", async (c) => {
   const req = createSubRequest(c, "/v1/chat/completions")
   if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
-  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  if (state.antigravityMode)
+    return antigravityChatCompletionsRoute.fetch(req, c.env)
   return completionRoutes.fetch(req, c.env)
 })
 server.all("/v1/chat/completions", async (c) => {
   const req = createSubRequest(c, "/v1/chat/completions")
   if (state.zenMode) return zenCompletionRoutes.fetch(req, c.env)
-  if (state.antigravityMode) return antigravityChatCompletionsRoute.fetch(req, c.env)
+  if (state.antigravityMode)
+    return antigravityChatCompletionsRoute.fetch(req, c.env)
   return completionRoutes.fetch(req, c.env)
 })
 
