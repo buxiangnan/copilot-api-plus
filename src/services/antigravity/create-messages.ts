@@ -82,7 +82,7 @@ interface AntigravityContent {
 
 interface ConvertedMessages {
   contents: Array<AntigravityContent>
-  systemInstruction?: { parts: Array<{ text: string }> }
+  systemInstruction?: { role: string; parts: Array<{ text: string }> }
 }
 
 /**
@@ -93,11 +93,13 @@ function convertMessages(
   system?: string,
 ): ConvertedMessages {
   const contents: Array<AntigravityContent> = []
-  let systemInstruction: { parts: Array<{ text: string }> } | undefined
+  let systemInstruction:
+    | { role: string; parts: Array<{ text: string }> }
+    | undefined
 
   if (system) {
-    // Antigravity API: { parts: [{ text: "..." }] } without role field
-    systemInstruction = { parts: [{ text: system }] }
+    // Google format: { role: "system", parts: [{text: "..."}] }
+    systemInstruction = { role: "system", parts: [{ text: system }] }
   }
 
   for (const message of messages) {
@@ -139,6 +141,7 @@ function buildParts(content: AnthropicMessage["content"]): Array<unknown> {
  * Clean and convert JSON schema to Gemini format
  * - Removes unsupported fields like $schema, additionalProperties
  * - Converts type values to uppercase (string -> STRING)
+ * - Ensures properties format is correct for Google API
  */
 function cleanJsonSchema(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") return schema
@@ -167,15 +170,45 @@ function cleanJsonSchema(schema: unknown): unknown {
     "maximum",
     "pattern",
     "format",
+    "const",
+    "allOf",
+    "anyOf",
+    "oneOf",
+    "not",
+  ])
+
+  // Allowlisted fields for Gemini API
+  const allowedFields = new Set([
+    "type",
+    "description",
+    "properties",
+    "required",
+    "items",
+    "enum",
   ])
 
   for (const [key, value] of Object.entries(obj)) {
     // Skip unsupported fields
     if (unsupportedFields.has(key)) continue
 
+    // Only include allowed fields
+    if (!allowedFields.has(key)) continue
+
     // Convert type values to uppercase for Gemini API
     if (key === "type" && typeof value === "string") {
       cleaned[key] = value.toUpperCase()
+    } else if (
+      key === "properties"
+      && typeof value === "object"
+      && value !== null
+    ) {
+      // Handle properties specially - clean each property value
+      const props = value as Record<string, unknown>
+      const cleanedProps: Record<string, unknown> = {}
+      for (const [propKey, propValue] of Object.entries(props)) {
+        cleanedProps[propKey] = cleanJsonSchema(propValue)
+      }
+      cleaned[key] = cleanedProps
     } else if (typeof value === "object" && value !== null) {
       cleaned[key] = cleanJsonSchema(value)
     } else {

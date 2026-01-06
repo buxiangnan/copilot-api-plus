@@ -95,14 +95,15 @@ function convertMessages(messages: Array<ChatMessage>): ConvertedContent {
  * Build system instruction from content
  */
 function buildSystemInstruction(content: ChatMessage["content"]): {
+  role: string
   parts: Array<{ text: string }>
 } {
   const text =
     typeof content === "string" ? content : (
       content.map((c) => c.text || "").join("")
     )
-  // Antigravity API: { parts: [{ text: "..." }] } without role field
-  return { parts: [{ text }] }
+  // Google format: { role: "system", parts: [{text: "..."}] }
+  return { role: "system", parts: [{ text }] }
 }
 
 /**
@@ -141,6 +142,7 @@ function parseBase64Image(
  * Clean and convert JSON schema to Gemini format
  * - Removes unsupported fields like $schema, additionalProperties
  * - Converts type values to uppercase (string -> STRING)
+ * - Ensures properties format is correct for Google API
  */
 function cleanJsonSchema(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") return schema
@@ -169,15 +171,45 @@ function cleanJsonSchema(schema: unknown): unknown {
     "maximum",
     "pattern",
     "format",
+    "const",
+    "allOf",
+    "anyOf",
+    "oneOf",
+    "not",
+  ])
+
+  // Allowlisted fields for Gemini API
+  const allowedFields = new Set([
+    "type",
+    "description",
+    "properties",
+    "required",
+    "items",
+    "enum",
   ])
 
   for (const [key, value] of Object.entries(obj)) {
     // Skip unsupported fields
     if (unsupportedFields.has(key)) continue
 
+    // Only include allowed fields
+    if (!allowedFields.has(key)) continue
+
     // Convert type values to uppercase for Gemini API
     if (key === "type" && typeof value === "string") {
       cleaned[key] = value.toUpperCase()
+    } else if (
+      key === "properties"
+      && typeof value === "object"
+      && value !== null
+    ) {
+      // Handle properties specially - clean each property value
+      const props = value as Record<string, unknown>
+      const cleanedProps: Record<string, unknown> = {}
+      for (const [propKey, propValue] of Object.entries(props)) {
+        cleanedProps[propKey] = cleanJsonSchema(propValue)
+      }
+      cleaned[key] = cleanedProps
     } else if (typeof value === "object" && value !== null) {
       cleaned[key] = cleanJsonSchema(value)
     } else {
