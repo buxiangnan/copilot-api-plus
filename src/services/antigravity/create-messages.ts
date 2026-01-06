@@ -82,7 +82,7 @@ interface AntigravityContent {
 
 interface ConvertedMessages {
   contents: Array<AntigravityContent>
-  systemInstruction?: { parts: { text: string } }
+  systemInstruction?: { parts: Array<{ text: string }> }
 }
 
 /**
@@ -93,11 +93,11 @@ function convertMessages(
   system?: string,
 ): ConvertedMessages {
   const contents: Array<AntigravityContent> = []
-  let systemInstruction: { parts: { text: string } } | undefined
+  let systemInstruction: { parts: Array<{ text: string }> } | undefined
 
   if (system) {
-    // Google Antigravity format: parts is a single object, not an array
-    systemInstruction = { parts: { text: system } }
+    // Google Gemini format: parts is an array of Part objects
+    systemInstruction = { parts: [{ text: system }] }
   }
 
   for (const message of messages) {
