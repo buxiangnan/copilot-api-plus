@@ -95,15 +95,14 @@ function convertMessages(messages: Array<ChatMessage>): ConvertedContent {
  * Build system instruction from content
  */
 function buildSystemInstruction(content: ChatMessage["content"]): {
-  role: string
-  parts: Array<{ text: string }>
+  parts: { text: string }
 } {
   const text =
     typeof content === "string" ? content : (
       content.map((c) => c.text || "").join("")
     )
-  // Google format: { role: "system", parts: [{text: "..."}] }
-  return { role: "system", parts: [{ text }] }
+  // Google Antigravity format: parts is a single object, not an array
+  return { parts: { text } }
 }
 
 /**
