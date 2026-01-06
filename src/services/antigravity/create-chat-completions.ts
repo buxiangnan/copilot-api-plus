@@ -101,7 +101,7 @@ function buildSystemInstruction(content: ChatMessage["content"]): {
     typeof content === "string" ? content : (
       content.map((c) => c.text || "").join("")
     )
-  // Google Gemini format: parts is an array of Part objects
+  // Antigravity format: parts is an array of Part objects with text field
   return { parts: [{ text }] }
 }
 
@@ -137,6 +137,51 @@ function parseBase64Image(
   return { mimeType: match[1], data: match[2] }
 }
 
+// Allowlisted fields for Gemini API Schema
+const GEMINI_ALLOWED_FIELDS = new Set([
+  "type",
+  "description",
+  "properties",
+  "required",
+  "items",
+  "enum",
+  "nullable",
+])
+
+/**
+ * Convert type value to Gemini format
+ * Handles both string and array types (for nullable)
+ */
+function convertTypeValue(
+  value: unknown,
+): { type: string; nullable?: boolean } | null {
+  if (typeof value === "string") {
+    return { type: value.toUpperCase() }
+  }
+  if (Array.isArray(value)) {
+    const nonNullType = value.find(
+      (t): t is string => typeof t === "string" && t !== "null",
+    )
+    if (nonNullType) {
+      return { type: nonNullType.toUpperCase(), nullable: true }
+    }
+  }
+  return null
+}
+
+/**
+ * Clean properties object recursively
+ */
+function cleanProperties(
+  props: Record<string, unknown>,
+): Record<string, unknown> {
+  const cleanedProps: Record<string, unknown> = {}
+  for (const [propKey, propValue] of Object.entries(props)) {
+    cleanedProps[propKey] = cleanJsonSchema(propValue)
+  }
+  return cleanedProps
+}
+
 /**
  * Clean and convert JSON schema to Gemini format
  * - Removes unsupported fields like $schema, additionalProperties
@@ -145,8 +190,6 @@ function parseBase64Image(
  */
 function cleanJsonSchema(schema: unknown): unknown {
   if (!schema || typeof schema !== "object") return schema
-
-  // Handle arrays
   if (Array.isArray(schema)) {
     return schema.map((item) => cleanJsonSchema(item))
   }
@@ -154,61 +197,17 @@ function cleanJsonSchema(schema: unknown): unknown {
   const obj = schema as Record<string, unknown>
   const cleaned: Record<string, unknown> = {}
 
-  // List of unsupported JSON Schema fields for Gemini API
-  const unsupportedFields = new Set([
-    "$schema",
-    "$id",
-    "$ref",
-    "additionalProperties",
-    "default",
-    "examples",
-    "minItems",
-    "maxItems",
-    "minLength",
-    "maxLength",
-    "minimum",
-    "maximum",
-    "pattern",
-    "format",
-    "const",
-    "allOf",
-    "anyOf",
-    "oneOf",
-    "not",
-  ])
-
-  // Allowlisted fields for Gemini API
-  const allowedFields = new Set([
-    "type",
-    "description",
-    "properties",
-    "required",
-    "items",
-    "enum",
-  ])
-
   for (const [key, value] of Object.entries(obj)) {
-    // Skip unsupported fields
-    if (unsupportedFields.has(key)) continue
+    if (!GEMINI_ALLOWED_FIELDS.has(key)) continue
 
-    // Only include allowed fields
-    if (!allowedFields.has(key)) continue
-
-    // Convert type values to uppercase for Gemini API
-    if (key === "type" && typeof value === "string") {
-      cleaned[key] = value.toUpperCase()
-    } else if (
-      key === "properties"
-      && typeof value === "object"
-      && value !== null
-    ) {
-      // Handle properties specially - clean each property value
-      const props = value as Record<string, unknown>
-      const cleanedProps: Record<string, unknown> = {}
-      for (const [propKey, propValue] of Object.entries(props)) {
-        cleanedProps[propKey] = cleanJsonSchema(propValue)
+    if (key === "type") {
+      const result = convertTypeValue(value)
+      if (result) {
+        cleaned.type = result.type
+        if (result.nullable) cleaned.nullable = true
       }
-      cleaned[key] = cleanedProps
+    } else if (key === "properties" && typeof value === "object" && value) {
+      cleaned.properties = cleanProperties(value as Record<string, unknown>)
     } else if (typeof value === "object" && value !== null) {
       cleaned[key] = cleanJsonSchema(value)
     } else {
